@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.constants import CAMPUS_AREAS
 from app.db.session import get_db
 from app.models import Category
 from app.schemas.common import ApiResponse, ok
@@ -38,6 +39,7 @@ ENUMS = EnumsOut(
         "abuse": "辱骂骚扰",
         "other": "其他",
     },
+    campus_area=CAMPUS_AREAS,
 )
 
 

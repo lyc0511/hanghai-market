@@ -16,3 +16,4 @@ class EnumsOut(BaseModel):
     club_type: dict[str, str]
     intent_status: dict[str, str]
     report_reason: dict[str, str]
+    campus_area: list[str]

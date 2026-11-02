@@ -5,6 +5,8 @@
 当前进度：
 - **T01 工程骨架与数据库**（14 张表、种子数据、FastAPI 骨架、字典接口）
 - **T02 登录认证**（注册、学号密码登录、JWT、当前用户、修改密码）
+- **T03 发布二手物品**（图片上传、发布物品进入待审核、物品详情；校区限定为黄埔 / 琶洲）
+- **T04 物品审核**（管理员审核列表、通过上架、驳回并附原因；通知卖家、记录管理日志）
 
 ## 技术栈
 
@@ -33,7 +35,7 @@ campus-platform/
         ├── db/                  # 声明基类、Session
         ├── models/              # 14 个 ORM 模型
         ├── schemas/             # Pydantic 模型
-        └── api/                 # 路由（meta 字典、auth 认证；deps.py 放登录依赖）
+        └── api/                 # 路由（meta 字典、auth 认证、upload 上传、items 物品、admin 管理后台；deps.py 放登录依赖）
 ```
 
 ## 快速开始（Windows PowerShell）
@@ -131,6 +133,12 @@ uv pip install -r requirements.txt --python .venv\Scripts\python.exe
 | 40102 | 账号已被封禁（登录时） |
 | 40103 | 原密码错误 |
 | 40901 | 学号已注册 |
+| 40401 | 物品不存在（或无权查看未上架的物品） |
+| 41301 | 图片超过大小限制 |
+| 41501 | 图片格式不支持 |
+| 42201 | 类目不存在或不是物品类目 |
+| 42901 | 今日发布数量已达上限 |
+| 40902 | 物品当前状态不能审核（只有待审核的物品能审核） |
 | 4xxxx | 其他业务错误（由 `BizError` 抛出，HTTP 200） |
 | 50000 | 服务器内部错误（控制台打印堆栈） |
 
@@ -139,12 +147,18 @@ uv pip install -r requirements.txt --python .venv\Scripts\python.exe
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | GET | `/` | 服务信息 |
-| GET | `/api/meta/enums` | 6 组枚举中文映射 |
+| GET | `/api/meta/enums` | 枚举中文映射 + 校区列表（前端下拉框用） |
 | GET | `/api/meta/categories?type=item\|club` | 类目列表 |
 | POST | `/api/auth/register` | 注册，成功后直接返回令牌 |
 | POST | `/api/auth/login` | 学号 + 密码登录 |
 | GET | `/api/auth/me` | 当前登录用户（需登录） |
 | POST | `/api/auth/password` | 修改密码（需登录） |
+| POST | `/api/upload/image` | 上传图片（需登录，jpg/png/webp，≤5MB） |
+| POST | `/api/items` | 发布物品（需登录，提交后为待审核） |
+| GET | `/api/items/{id}` | 物品详情（游客可看已上架的；卖家本人和管理员可看全部状态） |
+| GET | `/api/admin/items?status=pending` | 物品审核列表（管理员，分页；待审核按提交时间先到先审） |
+| POST | `/api/admin/items/{id}/approve` | 审核通过，物品上架（管理员） |
+| POST | `/api/admin/items/{id}/reject` | 审核驳回，需填写原因（管理员） |
 
 ## 登录与鉴权
 
@@ -174,3 +188,29 @@ def handler(user: User = Depends(get_current_user)): ...   # 需要登录
 @router.get("/admin/xxx")
 def handler(admin: User = Depends(require_admin)): ...     # 需要管理员
 ```
+
+## 发布物品流程
+
+1. 调用 `/api/upload/image` 逐张上传图片，返回 `path`（存库用）和 `url`（预览用）
+2. 调用 `/api/items`，`images` 字段填上一步返回的 `path` 数组
+3. 物品状态为 `pending`（待审核），只有卖家本人和管理员能看到；管理员审核通过后变为 `online`，所有人可见
+
+规则：
+- 标题 2–60 字；价格 0–99999（0 表示免费送）；成色 `new/like_new/good/fair`；图片 1–9 张；标签最多 5 个
+- 类目必须是物品类目（`/api/meta/categories?type=item`）
+- 每人每天（北京时间）最多发布 `DAILY_PUBLISH_LIMIT` 件，默认 10
+- 上传时按文件头判断真实格式，不信任扩展名；文件名随机生成，按年月分目录存放在 `UPLOAD_DIR`
+
+> 种子数据中的物品图片路径 `/uploads/demo/itemN.jpg` 只是占位，实际文件不存在，页面上会显示为裂图。
+
+## 物品审核流程
+
+```
+pending（待审核）──通过──▶ online（已上架，所有人可见）
+                └─驳回──▶ rejected（已驳回，卖家可看到驳回原因）
+```
+
+- 只有 `pending` 的物品可以审核，重复审核返回 40902
+- 每次审核在同一个事务中完成：修改物品状态、写入 `notifications` 通知卖家、写入 `audit_logs` 管理日志
+- 审核前对物品行加锁（`SELECT ... FOR UPDATE`），两个管理员同时审核同一件物品时只有一个会成功
+- 分页接口统一返回 `{"items": [...], "total": 总条数, "page": 页码, "page_size": 每页条数}`

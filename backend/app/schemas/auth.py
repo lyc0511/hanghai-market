@@ -3,6 +3,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.core.constants import CampusArea
+
 # 学号：纯数字；密码：8–32 位可见 ASCII 字符（bcrypt 最多处理 72 字节，限制 ASCII 可避免超长）
 STUDENT_NO_RE = re.compile(r"\d{6,20}")
 PASSWORD_RE = re.compile(r"[\x21-\x7E]{8,32}")
@@ -26,7 +28,7 @@ class RegisterIn(BaseModel):
     student_no: str = Field(description="学号，6–20 位数字")
     nickname: str = Field(min_length=1, max_length=30, description="昵称")
     password: str = Field(description="8–32 位，需同时包含字母和数字")
-    campus_area: str | None = Field(default=None, max_length=32, description="所在校区")
+    campus_area: CampusArea | None = Field(default=None, description="所在校区")
 
     @field_validator("nickname")
     @classmethod

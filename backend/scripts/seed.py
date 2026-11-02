@@ -19,6 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sqlalchemy import func, select, text  # noqa: E402
 
+from app.core.constants import CAMPUS_AREAS  # noqa: E402
 from app.core.security import hash_password  # noqa: E402
 from app.db.session import SessionLocal  # noqa: E402
 from app.models import (  # noqa: E402
@@ -39,7 +40,6 @@ from app.models import (  # noqa: E402
 )
 
 PASSWORD = "Test1234"
-CAMPUS_AREAS = ["黄埔校区", "琶洲校区", "白云校区"]
 ALL_TABLES = [
     "audit_logs", "ai_messages", "reports", "notifications", "activity_signups",
     "club_applications", "club_members", "trade_intents", "activities", "clubs",
@@ -83,7 +83,7 @@ def seed_users(db) -> dict[str, User]:
             nickname=nickname,
             password_hash=hash_password(PASSWORD),
             avatar_url=None,
-            campus_area=CAMPUS_AREAS[idx % 3],
+            campus_area=CAMPUS_AREAS[idx % len(CAMPUS_AREAS)],
             wechat_id_enc=f"wx_{no}",  # T03 再做加密，这里先存明文
             wechat_visible=True,
             role=role,
@@ -214,7 +214,7 @@ def seed_items(db, users, item_cats) -> list[Content]:
     for slug, rows in ITEM_DATA.items():
         for title, price, original, tags in rows:
             owner = users[owner_cycle[n % len(owner_cycle)]]
-            area = CAMPUS_AREAS[n % 3]
+            area = CAMPUS_AREAS[n % len(CAMPUS_AREAS)]
             condition = CONDITIONS[n % 4]
             summary = (
                 f"{title}，{'免费送给有需要的同学' if price == 0 else f'诚心转让 {price} 元'}，"
@@ -295,7 +295,7 @@ def seed_clubs(db, users, club_cats) -> dict[str, Content]:
             summary=summary,
             category_id=club_cats[ctype].id,
             tags=tags,
-            campus_area=CAMPUS_AREAS[idx % 3],
+            campus_area=CAMPUS_AREAS[idx % len(CAMPUS_AREAS)],
             status="online",
             view_count=rnd.randint(50, 800),
             search_text=build_search_text(name, summary + " " + note, tags),

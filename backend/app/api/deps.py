@@ -3,6 +3,7 @@
 用法：
     def handler(user: User = Depends(get_current_user)): ...
     def handler(admin: User = Depends(require_admin)): ...
+    def handler(user: User | None = Depends(get_optional_user)): ...   # 游客也能访问
 """
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -31,6 +32,20 @@ def get_current_user(
     if user.status != "active":
         raise HTTPException(status_code=403, detail="账号已被封禁")
     return user
+
+
+def get_optional_user(
+    cred: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+    db: Session = Depends(get_db),
+) -> User | None:
+    """可选登录：未带令牌、令牌无效或账号被封时都按游客处理，不报错。"""
+    if cred is None:
+        return None
+    user_id = decode_access_token(cred.credentials)
+    if user_id is None:
+        return None
+    user = db.get(User, user_id)
+    return user if user is not None and user.status == "active" else None
 
 
 def require_admin(user: User = Depends(get_current_user)) -> User:

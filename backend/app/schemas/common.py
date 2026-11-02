@@ -13,5 +13,14 @@ class ApiResponse(BaseModel, Generic[T]):
     data: T | None = None
 
 
+class Page(BaseModel, Generic[T]):
+    """分页外壳：items 为当前页数据，total 为符合条件的总条数。"""
+
+    items: list[T]
+    total: int
+    page: int
+    page_size: int
+
+
 def ok(data: T | None = None, message: str = "ok") -> ApiResponse[T]:
     return ApiResponse(code=0, message=message, data=data)

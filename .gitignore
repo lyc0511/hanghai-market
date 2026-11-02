@@ -6,3 +6,6 @@ uploads/
 node_modules/
 *.log
 .DS_Store
+
+# PyCharm 个人编辑器配置
+.idea/
