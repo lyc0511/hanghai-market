@@ -8,6 +8,7 @@ import { toast } from 'vue-sonner'
 
 import { activityApi } from '@/api'
 import PageHeader from '@/components/PageHeader.vue'
+import ReportButton from '@/components/ReportButton.vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -89,7 +90,9 @@ async function onCancel() {
 
 <template>
   <div class="container">
-    <PageHeader title="活动详情" />
+    <PageHeader title="活动详情">
+      <ReportButton v-if="act && !act.is_organizer && act.status === 'online'" target-type="activity" :target-id="act.id" />
+    </PageHeader>
 
     <div v-if="notFound" class="py-24 text-center">
       <p class="font-display text-2xl text-ocean">这个活动不存在或还没通过审核</p>

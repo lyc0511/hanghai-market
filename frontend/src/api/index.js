@@ -66,6 +66,8 @@ export const adminApi = {
   activities: (params) => http.get('/admin/activities', { params }),
   approveActivity: (id) => http.post(`/admin/activities/${id}/approve`),
   rejectActivity: (id, reason) => http.post(`/admin/activities/${id}/reject`, { reason }),
+  reports: (params) => http.get('/admin/reports', { params }),
+  handleReport: (id, data) => http.post(`/admin/reports/${id}/handle`, data),
 }
 
 export const activityApi = {
@@ -85,4 +87,9 @@ export const notificationApi = {
   unreadCount: () => http.get('/notifications/unread-count'),
   read: (id) => http.post(`/notifications/${id}/read`),
   readAll: () => http.post('/notifications/read-all'),
+}
+
+export const reportApi = {
+  create: (data) => http.post('/reports', data),
+  mine: (params) => http.get('/reports/mine', { params }),
 }

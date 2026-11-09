@@ -8,6 +8,7 @@ import { toast } from 'vue-sonner'
 
 import { intentApi, itemApi } from '@/api'
 import PageHeader from '@/components/PageHeader.vue'
+import ReportButton from '@/components/ReportButton.vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -112,7 +113,9 @@ async function ownerAct(name) {
 
 <template>
   <div class="container">
-    <PageHeader title="物品详情" />
+    <PageHeader title="物品详情">
+      <ReportButton v-if="item && !item.is_mine && item.status === 'online'" target-type="item" :target-id="item.id" />
+    </PageHeader>
 
     <div v-if="notFound" class="py-24 text-center">
       <p class="font-display text-2xl text-ocean">这件物品不存在或已下架</p>

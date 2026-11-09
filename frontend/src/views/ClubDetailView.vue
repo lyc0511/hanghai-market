@@ -8,6 +8,7 @@ import { toast } from 'vue-sonner'
 import { clubApi } from '@/api'
 import ClubActivities from '@/components/ClubActivities.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import ReportButton from '@/components/ReportButton.vue'
 import SignalFlag from '@/components/SignalFlag.vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -194,6 +195,7 @@ watch(
         <SignalFlag />
         <Badge class="bg-buoy text-white">招新中</Badge>
       </span>
+      <ReportButton v-if="club && club.my_status !== 'president'" target-type="club" :target-id="club.id" />
     </PageHeader>
 
     <div v-if="notFound" class="py-24 text-center">

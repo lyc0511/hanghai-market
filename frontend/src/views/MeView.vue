@@ -1,6 +1,6 @@
 <!-- 个人中心：基本信息、微信号设置、常用入口 -->
 <script setup>
-import { Bell, CalendarDays, ChevronRight, Loader2, LogOut, Package, Settings, ShieldCheck, ShoppingBag, Store, Users } from '@lucide/vue'
+import { Bell, CalendarDays, ChevronRight, Flag, Loader2, LogOut, Package, Settings, ShieldCheck, ShoppingBag, Store, Users } from '@lucide/vue'
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
@@ -28,6 +28,7 @@ const LINKS = [
   { to: { name: 'my-intents', query: { role: 'buyer' } }, icon: ShoppingBag, label: '我想要的' },
   { to: { name: 'my-intents', query: { role: 'seller' } }, icon: Store, label: '找我买的' },
   { to: { name: 'notifications' }, icon: Bell, label: '消息通知' },
+  { to: { name: 'my-reports' }, icon: Flag, label: '我的举报' },
 ]
 
 function openWechat() {
