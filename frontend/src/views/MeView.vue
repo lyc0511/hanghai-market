@@ -93,7 +93,7 @@ async function onLogout() {
         <span class="flex-1 text-ocean">{{ l.label }}</span>
         <ChevronRight class="size-4 text-muted-foreground" />
       </router-link>
-      <router-link v-if="user.isAdmin" :to="{ name: 'admin-items' }" class="flex items-center gap-3 px-4 py-3.5 hover:bg-sail">
+      <router-link v-if="user.isAdmin" :to="{ name: 'admin-dashboard' }" class="flex items-center gap-3 px-4 py-3.5 hover:bg-sail">
         <Settings class="size-5 text-signal" />
         <span class="flex-1 text-ocean">管理后台</span>
         <span class="text-xs text-muted-foreground">建议在电脑上打开</span>

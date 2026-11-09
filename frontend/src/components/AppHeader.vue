@@ -144,7 +144,7 @@ function logout() {
             <DropdownMenuItem @select="go('notifications')"><Bell />消息通知</DropdownMenuItem>
             <template v-if="user.isAdmin">
               <DropdownMenuSeparator />
-              <DropdownMenuItem @select="go('admin-items')"><Settings />管理后台</DropdownMenuItem>
+              <DropdownMenuItem @select="go('admin-dashboard')"><Settings />管理后台</DropdownMenuItem>
             </template>
             <DropdownMenuSeparator />
             <DropdownMenuItem @select="logout"><LogOut />退出登录</DropdownMenuItem>

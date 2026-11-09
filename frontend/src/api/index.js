@@ -68,6 +68,11 @@ export const adminApi = {
   rejectActivity: (id, reason) => http.post(`/admin/activities/${id}/reject`, { reason }),
   reports: (params) => http.get('/admin/reports', { params }),
   handleReport: (id, data) => http.post(`/admin/reports/${id}/handle`, data),
+  dashboard: (params) => http.get('/admin/dashboard', { params }),
+  users: (params) => http.get('/admin/users', { params }),
+  banUser: (id, data) => http.post(`/admin/users/${id}/ban`, data),
+  unbanUser: (id) => http.post(`/admin/users/${id}/unban`),
+  auditLogs: (params) => http.get('/admin/audit-logs', { params }),
 }
 
 export const activityApi = {

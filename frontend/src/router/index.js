@@ -37,10 +37,12 @@ const routes = [
     component: () => import('@/layouts/AdminLayout.vue'),
     meta: { auth: true, admin: true },
     children: [
-      { path: '', redirect: { name: 'admin-items' } },
+      { path: '', name: 'admin-dashboard', component: () => import('@/views/admin/DashboardView.vue'), meta: { title: '数据看板' } },
       { path: 'items', name: 'admin-items', component: () => import('@/views/admin/ItemReviewView.vue'), meta: { title: '物品审核' } },
       { path: 'activities', name: 'admin-activities', component: () => import('@/views/admin/ActivityReviewView.vue'), meta: { title: '活动审核' } },
       { path: 'reports', name: 'admin-reports', component: () => import('@/views/admin/ReportView.vue'), meta: { title: '举报处理' } },
+      { path: 'users', name: 'admin-users', component: () => import('@/views/admin/UserManageView.vue'), meta: { title: '用户管理' } },
+      { path: 'audit-logs', name: 'admin-audit-logs', component: () => import('@/views/admin/AuditLogView.vue'), meta: { title: '操作日志' } },
     ],
   },
   { path: '/login', name: 'login', component: () => import('@/views/LoginView.vue'), meta: { title: '登录' } },

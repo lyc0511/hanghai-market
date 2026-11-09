@@ -1,6 +1,6 @@
 <!-- 管理后台外壳（电脑端）：左侧菜单 + 顶栏 + 内容区，使用 Element Plus -->
 <script setup>
-import { Calendar, Goods, Warning, HomeFilled, SwitchButton } from '@element-plus/icons-vue'
+import { Calendar, DataAnalysis, Document, Goods, User, Warning, HomeFilled, SwitchButton } from '@element-plus/icons-vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { useUserStore } from '@/stores/user'
@@ -26,6 +26,10 @@ function logout() {
         </div>
       </div>
       <el-menu :default-active="route.name" router class="menu">
+        <el-menu-item index="admin-dashboard" :route="{ name: 'admin-dashboard' }">
+          <el-icon><DataAnalysis /></el-icon>
+          <span>数据看板</span>
+        </el-menu-item>
         <el-menu-item index="admin-items" :route="{ name: 'admin-items' }">
           <el-icon><Goods /></el-icon>
           <span>物品审核</span>
@@ -37,6 +41,14 @@ function logout() {
         <el-menu-item index="admin-reports" :route="{ name: 'admin-reports' }">
           <el-icon><Warning /></el-icon>
           <span>举报处理</span>
+        </el-menu-item>
+        <el-menu-item index="admin-users" :route="{ name: 'admin-users' }">
+          <el-icon><User /></el-icon>
+          <span>用户管理</span>
+        </el-menu-item>
+        <el-menu-item index="admin-audit-logs" :route="{ name: 'admin-audit-logs' }">
+          <el-icon><Document /></el-icon>
+          <span>操作日志</span>
         </el-menu-item>
       </el-menu>
     </el-aside>

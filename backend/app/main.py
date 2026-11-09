@@ -3,7 +3,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from app.api import activities, admin, auth, clubs, intents, items, meta, notifications, reports, upload
+from app.api import activities, admin, admin_system, auth, clubs, intents, items, meta, notifications, reports, upload
 from app.core.config import settings
 from app.core.exceptions import register_exception_handlers
 
@@ -31,6 +31,7 @@ app.include_router(notifications.router, prefix="/api")
 app.include_router(reports.router, prefix="/api")
 app.include_router(reports.admin_router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
+app.include_router(admin_system.router, prefix="/api")
 
 
 @app.get("/", tags=["系统"], summary="服务信息")
