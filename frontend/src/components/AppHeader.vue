@@ -3,7 +3,7 @@
   手机宽度下，导航和搜索收进左侧抽屉菜单。
 -->
 <script setup>
-import { ChevronDown, LogOut, Menu, Package, Plus, Search, Settings, ShoppingBag, User } from '@lucide/vue'
+import { ChevronDown, LogOut, Menu, Package, Plus, Search, Settings, ShoppingBag, User, Users } from '@lucide/vue'
 import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -111,6 +111,7 @@ function logout() {
             <DropdownMenuSeparator />
             <DropdownMenuItem @select="go('me')"><User />个人中心</DropdownMenuItem>
             <DropdownMenuItem @select="go('my-items')"><Package />我发布的</DropdownMenuItem>
+            <DropdownMenuItem @select="go('my-clubs')"><Users />我的社团</DropdownMenuItem>
             <DropdownMenuItem @select="go('my-intents')"><ShoppingBag />我的意向</DropdownMenuItem>
             <template v-if="user.isAdmin">
               <DropdownMenuSeparator />

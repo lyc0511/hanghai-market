@@ -45,6 +45,20 @@ export const intentApi = {
   complete: (id) => http.post(`/intents/${id}/complete`),
 }
 
+export const clubApi = {
+  list: (params) => http.get('/clubs', { params }),
+  mine: (params) => http.get('/clubs/mine', { params }),
+  detail: (id) => http.get(`/clubs/${id}`),
+  update: (id, body) => http.put(`/clubs/${id}`, body),
+  members: (id, params) => http.get(`/clubs/${id}/members`, { params }),
+  apply: (id, reason) => http.post(`/clubs/${id}/applications`, { reason }),
+  applications: (id, params) => http.get(`/clubs/${id}/applications`, { params }),
+  leave: (id) => http.post(`/clubs/${id}/leave`),
+  myApplications: (params) => http.get('/club-applications/mine', { params }),
+  approve: (id) => http.post(`/club-applications/${id}/approve`),
+  reject: (id, note) => http.post(`/club-applications/${id}/reject`, { note }),
+}
+
 export const adminApi = {
   items: (params) => http.get('/admin/items', { params }),
   approveItem: (id) => http.post(`/admin/items/${id}/approve`),

@@ -8,8 +8,9 @@ import { motion } from 'motion-v'
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
-import { itemApi } from '@/api'
+import { clubApi, itemApi } from '@/api'
 import ItemCard from '@/components/ItemCard.vue'
+import SignalFlag from '@/components/SignalFlag.vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -22,10 +23,21 @@ const meta = useMetaStore()
 const keyword = ref('')
 const arrivals = ref([]) // 到港公告：最新上架的物品
 const shelf = ref([]) // 闲置货架
+const recruitingClubs = ref([])
+const clubsLoaded = ref(false)
 const loading = ref(true)
 
 onMounted(async () => {
   meta.load().catch(() => {})
+  const clubsTask = clubApi
+    .list({ recruiting: true, page: 1, page_size: 20 })
+    .then((data) => {
+      recruitingClubs.value = data.items
+    })
+    .catch(() => {})
+    .finally(() => {
+      clubsLoaded.value = true
+    })
   try {
     const data = await itemApi.list({ page: 1, page_size: 10, sort: 'latest' })
     arrivals.value = data.items.slice(0, 5)
@@ -33,6 +45,7 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
+  await clubsTask
 })
 
 function onSearch() {
@@ -124,15 +137,22 @@ function flip(i) {
           <h2 class="font-display text-3xl text-ocean">社团</h2>
           <router-link :to="{ name: 'clubs' }" class="flex items-center gap-1 text-sm text-signal hover:underline">全部社团<ArrowRight class="size-4" /></router-link>
         </div>
-        <div class="rounded-xl border border-dashed bg-white/60 p-6">
-          <p class="flex items-center gap-2 font-medium text-ocean">
-            <span class="inline-block size-0 border-y-[6px] border-l-[11px] border-y-transparent border-l-buoy" aria-hidden="true" />
-            社团目录正在建设
-          </p>
-          <p class="mt-2 text-sm leading-relaxed text-muted-foreground">
-            上线后可以浏览全校社团、在线申请入社。正在招新的社团会在名字前挂出一面橙色信号旗。
-          </p>
+        <div v-if="!clubsLoaded" class="flex flex-wrap gap-2">
+          <Skeleton v-for="i in 6" :key="i" class="h-9 w-24 rounded-full" />
         </div>
+        <div v-else-if="recruitingClubs.length" class="flex flex-wrap gap-2">
+          <router-link
+            v-for="c in recruitingClubs"
+            :key="c.id"
+            :to="{ name: 'club', params: { id: c.id } }"
+            class="inline-flex items-center gap-2 rounded-full border bg-white px-3 py-1.5 text-sm text-ocean hover:border-buoy"
+          >
+            <SignalFlag />
+            <span class="sr-only">正在招新</span>
+            {{ c.title }}
+          </router-link>
+        </div>
+        <p v-else class="rounded-xl border border-dashed bg-white/60 px-4 py-6 text-sm text-muted-foreground">现在没有社团在招新</p>
       </div>
 
       <div>

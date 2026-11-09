@@ -14,6 +14,7 @@
 - **F03 网站改版**（电脑网站布局：顶部导航 + 右上角登录弹窗；首页横幅 + 二手 / 社团 / 活动三大板块；二手交易页宽屏筛选与分页；详情页左右两栏；手机端自动单列）
 - **F04 前端重做（shadcn-vue）**（「港口公告牌」设计：港口色板 + 得意黑标题字体；首页到港公告牌翻牌动画；二手市场筛选网格重排动画；全站 shadcn 组件，移除 Vant）
 - **T07 物品管理**（卖家编辑（重新审核）、下架、重新上架、软删除；进行中的意向自动关闭并通知买家；前后端同步）
+- **T08 社团目录与入社**（列表筛选、详情、申请、会长审批 / 编辑招新、退出；首页信号旗、我的社团）
 
 ## 技术栈
 
@@ -43,7 +44,7 @@ campus-platform/
         ├── db/                  # 声明基类、Session
         ├── models/              # 14 个 ORM 模型
         ├── schemas/             # Pydantic 模型
-        └── api/                 # 路由（meta 字典、auth 认证、upload 上传、items 物品、intents 交易意向、admin 管理后台；deps.py 放登录依赖）
+        └── api/                 # 路由（meta 字典、auth 认证、upload 上传、items 物品、intents 交易意向、clubs 社团、admin 管理后台；deps.py 放登录依赖）
 ```
 
 ## 快速开始（Windows PowerShell）
@@ -168,6 +169,15 @@ npm run dev
 | 42202 | 需要先在个人资料中填写微信号 |
 | 42203 | 不能对自己的物品发起意向 |
 | 42204 | 物品不在售 |
+| 40331 | 无权管理该社团（不是会长） |
+| 40431 | 社团不存在 |
+| 40432 | 入社申请不存在 |
+| 40931 | 已是该社团成员（或已是会长） |
+| 40932 | 已有待审核的入社申请 |
+| 40933 | 申请当前状态不能审批 |
+| 42231 | 社团当前不在招新 |
+| 42232 | 会长不能退出 |
+| 42233 | 还不是该社团成员 |
 | 4xxxx | 其他业务错误（由 `BizError` 抛出，HTTP 200） |
 | 50000 | 服务器内部错误（控制台打印堆栈） |
 
@@ -201,6 +211,17 @@ npm run dev
 | GET | `/api/admin/items?status=pending` | 物品审核列表（管理员，分页；待审核按提交时间先到先审） |
 | POST | `/api/admin/items/{id}/approve` | 审核通过，物品上架（管理员） |
 | POST | `/api/admin/items/{id}/reject` | 审核驳回，需填写原因（管理员） |
+| GET | `/api/clubs` | 社团列表（类型 / 校区 / 是否正在招新 / 关键词，分页） |
+| GET | `/api/clubs/mine` | 我加入的、我管理的社团（需登录） |
+| GET | `/api/clubs/{id}` | 社团详情；登录用户额外返回 `my_status` |
+| PUT | `/api/clubs/{id}` | 会长修改简介和招新信息 |
+| GET | `/api/clubs/{id}/members` | 成员列表（分页） |
+| POST | `/api/clubs/{id}/applications` | 申请入社（需登录，理由必填） |
+| GET | `/api/clubs/{id}/applications?status=pending` | 会长查看入社申请 |
+| POST | `/api/clubs/{id}/leave` | 成员退出（会长不能退出） |
+| GET | `/api/club-applications/mine` | 我提交的入社申请 |
+| POST | `/api/club-applications/{id}/approve` | 会长通过申请，写入成员且人数 +1 |
+| POST | `/api/club-applications/{id}/reject` | 会长拒绝申请，可再次申请 |
 
 ## 登录与鉴权
 
@@ -321,3 +342,21 @@ frontend/src/
 - 任何编辑都回到待审核，防止「先发正常内容过审、再改成违规内容」
 - 编辑、下架、删除时，该物品上待处理和已接受的意向自动关闭并通知买家
 - 删除是软删除：只把状态改为 `deleted`，数据和成交记录保留，便于追溯纠纷
+
+## 社团目录与入社
+
+```
+未加入 ──提交申请──▶ pending ──会长通过──▶ 成员（写入 club_members，member_count + 1）
+                      └─会长拒绝──▶ rejected（可以再次申请）
+成员 ──退出──▶ 删掉成员记录，member_count - 1
+会长不能退出。
+```
+
+- 只有 `recruit_status = recruiting`，并且今天（北京时间）落在招新起止日期内，才能申请
+- 已经是成员，或已经有一条待审核申请时，不能重复申请。两个人同时点提交时，部分唯一索引 `uq_club_app_pending` 保证只有一条待审记录，接口把冲突转成 40932
+- 会长可以改简介、招新状态、招新说明和起止日期，不能改社团名称和会长是谁
+- 申请时通知会长（`club_apply`），审批后通知申请人（`club_approved` / `club_rejected`），成员退出通知会长（`club_left`）
+- 通过或拒绝前先锁申请行、再锁社团行；成员人数和成员表在同一个事务里改
+- 被拒绝后可以再次申请。小李（20230003）对摄影协会有一条待审申请，会长是 20230004
+
+页面：`/clubs` 目录、`/clubs/:id` 详情、`/clubs/:id/applications` 会长审批、`/me/clubs` 我的社团。首页「社团」板块只挂出今天正在招新的名字，前面有橙色信号旗。
