@@ -20,6 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from sqlalchemy import func, select, text  # noqa: E402
 
 from app.core.constants import CAMPUS_AREAS  # noqa: E402
+from app.core.crypto import encrypt_text  # noqa: E402
 from app.core.security import hash_password  # noqa: E402
 from app.db.session import SessionLocal  # noqa: E402
 from app.models import (  # noqa: E402
@@ -84,7 +85,7 @@ def seed_users(db) -> dict[str, User]:
             password_hash=hash_password(PASSWORD),
             avatar_url=None,
             campus_area=CAMPUS_AREAS[idx % len(CAMPUS_AREAS)],
-            wechat_id_enc=f"wx_{no}",  # T03 再做加密，这里先存明文
+            wechat_id_enc=encrypt_text(f"wx_{no}"),  # 演示微信号，AES-GCM 加密存储
             wechat_visible=True,
             role=role,
             auth_source="open",

@@ -1,4 +1,4 @@
-"""认证接口：注册、登录、当前用户、修改密码。
+"""认证接口：注册、登录、当前用户、修改个人资料、修改密码。
 
 业务错误码：
     40101 学号或密码错误    40102 账号已被封禁
@@ -11,19 +11,26 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
+from app.core.crypto import decrypt_text, encrypt_text
 from app.core.exceptions import BizError
 from app.core.security import create_access_token, hash_password, verify_password
 from app.db.session import get_db
 from app.models import User
-from app.schemas.auth import ChangePasswordIn, LoginIn, RegisterIn, TokenOut, UserOut
+from app.schemas.auth import ChangePasswordIn, LoginIn, ProfileUpdateIn, RegisterIn, TokenOut, UserOut
 from app.schemas.common import ApiResponse, ok
 
 router = APIRouter(prefix="/auth", tags=["认证"])
 
 
+def user_out(user: User) -> UserOut:
+    out = UserOut.model_validate(user)
+    out.wechat_id = decrypt_text(user.wechat_id_enc)
+    return out
+
+
 def _token_for(user: User) -> TokenOut:
     token, expires_in = create_access_token(user.id)
-    return TokenOut(access_token=token, expires_in=expires_in, user=UserOut.model_validate(user))
+    return TokenOut(access_token=token, expires_in=expires_in, user=user_out(user))
 
 
 @router.post("/register", response_model=ApiResponse[TokenOut], summary="注册（成功后直接登录）")
@@ -60,7 +67,27 @@ def login(body: LoginIn, db: Session = Depends(get_db)) -> ApiResponse[TokenOut]
 
 @router.get("/me", response_model=ApiResponse[UserOut], summary="当前登录用户")
 def me(user: User = Depends(get_current_user)) -> ApiResponse[UserOut]:
-    return ok(UserOut.model_validate(user))
+    return ok(user_out(user))
+
+
+@router.patch("/me", response_model=ApiResponse[UserOut], summary="修改个人资料（含微信号）")
+def update_me(
+    body: ProfileUpdateIn,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ApiResponse[UserOut]:
+    # exclude_unset：只处理前端实际传了的字段
+    data = body.model_dump(exclude_unset=True)
+    if data.get("nickname") is not None:
+        user.nickname = data["nickname"]
+    if data.get("campus_area") is not None:
+        user.campus_area = data["campus_area"]
+    if "avatar_url" in data:
+        user.avatar_url = data["avatar_url"]
+    if "wechat_id" in data:
+        user.wechat_id_enc = encrypt_text(data["wechat_id"]) if data["wechat_id"] else None
+    db.commit()
+    return ok(user_out(user), "资料已更新")
 
 
 @router.post("/password", response_model=ApiResponse[None], summary="修改密码")

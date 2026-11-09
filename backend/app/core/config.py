@@ -39,3 +39,10 @@ settings = Settings()
 
 if len(settings.JWT_SECRET.encode()) < 32:
     raise RuntimeError("JWT_SECRET 必须至少 32 字节，请用 secrets.token_hex(32) 生成")
+
+try:
+    _aes_key_ok = len(bytes.fromhex(settings.WECHAT_AES_KEY)) == 32
+except ValueError:
+    _aes_key_ok = False
+if not _aes_key_ok:
+    raise RuntimeError("WECHAT_AES_KEY 必须是 64 位十六进制（32 字节），请用 secrets.token_hex(32) 生成")

@@ -3,7 +3,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from app.api import admin, auth, items, meta, upload
+from app.api import admin, auth, intents, items, meta, upload
 from app.core.config import settings
 from app.core.exceptions import register_exception_handlers
 
@@ -22,6 +22,7 @@ app.include_router(meta.router, prefix="/api")
 app.include_router(auth.router, prefix="/api")
 app.include_router(upload.router, prefix="/api")
 app.include_router(items.router, prefix="/api")
+app.include_router(intents.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
 
 

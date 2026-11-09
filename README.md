@@ -8,6 +8,7 @@
 - **T03 发布二手物品**（图片上传、发布物品进入待审核、物品详情；校区限定为黄埔 / 琶洲）
 - **T04 物品审核**（管理员审核列表、通过上架、驳回并附原因；通知卖家、记录管理日志）
 - **T05 物品列表与搜索**（关键词搜索、分类 / 校区 / 成色 / 价格筛选、四种排序、分页；我发布的物品）
+- **T06 个人资料与交易意向**（微信号 AES-GCM 加密存储；发起 / 接受 / 拒绝 / 取消 / 成交，接受后双方互看微信号）
 
 ## 技术栈
 
@@ -36,7 +37,7 @@ campus-platform/
         ├── db/                  # 声明基类、Session
         ├── models/              # 14 个 ORM 模型
         ├── schemas/             # Pydantic 模型
-        └── api/                 # 路由（meta 字典、auth 认证、upload 上传、items 物品、admin 管理后台；deps.py 放登录依赖）
+        └── api/                 # 路由（meta 字典、auth 认证、upload 上传、items 物品、intents 交易意向、admin 管理后台；deps.py 放登录依赖）
 ```
 
 ## 快速开始（Windows PowerShell）
@@ -91,6 +92,8 @@ uv pip install -r requirements.txt --python .venv\Scripts\python.exe
 
 ### 5. 写入种子数据（可反复执行）
 
+> `.env` 中的 `WECHAT_AES_KEY` 必须是 64 位十六进制，否则服务和种子脚本都会拒绝启动。生成方法同 JWT_SECRET。
+
 ```powershell
 .venv\Scripts\python scripts\seed.py
 ```
@@ -140,6 +143,13 @@ uv pip install -r requirements.txt --python .venv\Scripts\python.exe
 | 42201 | 类目不存在或不是物品类目 |
 | 42901 | 今日发布数量已达上限 |
 | 40902 | 物品当前状态不能审核（只有待审核的物品能审核） |
+| 40402 | 意向不存在 |
+| 40301 | 无权操作该意向 |
+| 40903 | 已对该物品发起过意向 |
+| 40904 | 意向当前状态不能执行此操作 |
+| 42202 | 需要先在个人资料中填写微信号 |
+| 42203 | 不能对自己的物品发起意向 |
+| 42204 | 物品不在售 |
 | 4xxxx | 其他业务错误（由 `BizError` 抛出，HTTP 200） |
 | 50000 | 服务器内部错误（控制台打印堆栈） |
 
@@ -153,12 +163,19 @@ uv pip install -r requirements.txt --python .venv\Scripts\python.exe
 | POST | `/api/auth/register` | 注册，成功后直接返回令牌 |
 | POST | `/api/auth/login` | 学号 + 密码登录 |
 | GET | `/api/auth/me` | 当前登录用户（需登录） |
+| PATCH | `/api/auth/me` | 修改个人资料：昵称、校区、头像、微信号（需登录） |
 | POST | `/api/auth/password` | 修改密码（需登录） |
 | POST | `/api/upload/image` | 上传图片（需登录，jpg/png/webp，≤5MB） |
 | GET | `/api/items` | 物品列表 / 搜索（只返回已上架，分页） |
 | GET | `/api/items/mine` | 我发布的物品，含待审核 / 已驳回（需登录） |
 | POST | `/api/items` | 发布物品（需登录，提交后为待审核） |
 | GET | `/api/items/{id}` | 物品详情（游客可看已上架的；卖家本人和管理员可看全部状态） |
+| POST | `/api/intents` | 发起交易意向（买家） |
+| GET | `/api/intents/mine?role=buyer\|seller` | 我的意向（我发起的 / 我收到的） |
+| POST | `/api/intents/{id}/accept` | 接受意向（卖家），双方可见微信号 |
+| POST | `/api/intents/{id}/reject` | 拒绝意向（卖家） |
+| POST | `/api/intents/{id}/cancel` | 取消意向（买家，待处理或已接受时） |
+| POST | `/api/intents/{id}/complete` | 标记成交（卖家），物品自动下架 |
 | GET | `/api/admin/items?status=pending` | 物品审核列表（管理员，分页；待审核按提交时间先到先审） |
 | POST | `/api/admin/items/{id}/approve` | 审核通过，物品上架（管理员） |
 | POST | `/api/admin/items/{id}/reject` | 审核驳回，需填写原因（管理员） |
@@ -234,3 +251,21 @@ pending（待审核）──通过──▶ online（已上架，所有人可见
 
 - 搜索基于 `contents.search_text`（发布时由标题、描述、标签拼接），使用 `ILIKE`；用户输入的 `%`、`_` 会被转义，按普通字符匹配
 - 列表返回精简的「卡片」字段（封面为第一张图），完整信息走详情接口
+
+## 交易意向与微信号
+
+```
+pending ──卖家接受──▶ accepted ──卖家标记成交──▶ completed（物品下架、记录售出时间）
+   │  └─卖家拒绝──▶ rejected
+   └──────┴─买家取消──▶ cancelled
+```
+
+- 发起和接受意向前，双方都必须在个人资料中填写微信号
+- 卖家可以同时接受多个意向；某一单成交后，同一物品其余进行中的意向自动关闭并通知买家
+- 只有 `accepted` / `completed` 状态下，接口才返回对方的微信号
+- 每一步都会给对方写一条站内通知
+- 成交时先锁物品行，同一物品的两个意向同时成交只有一个会成功
+
+微信号用 **AES-256-GCM** 加密后存入 `users.wechat_id_enc`（格式 `v1:<base64>`），只在本人查看资料或交易意向被接受时解密。与密码的区别：密码用 bcrypt 哈希（不可逆，只需比对），微信号需要展示给对方，所以用可解密的对称加密。
+
+旧数据中的明文微信号可用 `scripts/encrypt_wechat.py` 一次性加密（可重复执行）。
