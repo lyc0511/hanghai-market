@@ -27,11 +27,15 @@ from app.api.upload import public_url
 from app.core.config import settings
 from app.core.constants import CampusArea
 from app.core.exceptions import BizError
+from app.core.query import contains, paginate
 from app.db.session import get_db
 from app.api.notifications import notify
 from app.models import Category, Content, Item, TradeIntent, User
 from app.schemas.common import ApiResponse, Page, ok
 from app.schemas.item import CategoryBrief, ItemCardOut, ItemCondition, ItemCreateIn, ItemDetailOut, SellerBrief
+
+# 物品列表取数据时一起加载的关联：物品详情、发布者、分类
+ITEM_LOAD = (joinedload(Content.item), joinedload(Content.owner), joinedload(Content.category))
 
 router = APIRouter(prefix="/items", tags=["二手物品"])
 
@@ -89,22 +93,6 @@ def to_card(c: Content, show_reject_reason: bool = False) -> ItemCardOut:
         seller_nickname=c.owner.nickname,
         created_at=c.created_at,
     )
-
-
-def escape_like(s: str) -> str:
-    """转义 LIKE 通配符，让用户输入的 % 和 _ 按普通字符匹配。"""
-    return s.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-
-
-def paginate(db: Session, stmt, page: int, page_size: int) -> tuple[list[Content], int]:
-    """对一个 select(Content) 查询做分页，返回 (当前页数据, 总条数)。"""
-    total = db.scalar(select(func.count()).select_from(stmt.order_by(None).subquery()))
-    rows = db.scalars(
-        stmt.options(joinedload(Content.item), joinedload(Content.owner), joinedload(Content.category))
-        .offset((page - 1) * page_size)
-        .limit(page_size)
-    ).all()
-    return list(rows), total
 
 
 SORTS = {
@@ -191,7 +179,7 @@ def list_items(
     # 每个条件都是「有就加」：用户没填的筛选项不参与查询
     if keyword:
         for word in keyword.split():
-            stmt = stmt.where(Content.search_text.ilike(f"%{escape_like(word)}%", escape="\\"))
+            stmt = stmt.where(Content.search_text.ilike(contains(word), escape="\\"))
     if category_id is not None:
         stmt = stmt.where(Content.category_id == category_id)
     if campus_area is not None:
@@ -204,7 +192,7 @@ def list_items(
         stmt = stmt.where(Item.price <= price_max)
     stmt = stmt.order_by(*SORTS[sort], Content.id.desc())
 
-    rows, total = paginate(db, stmt, page, page_size)
+    rows, total = paginate(db, stmt, page, page_size, options=ITEM_LOAD)
     return ok(Page(items=[to_card(c) for c in rows], total=total, page=page, page_size=page_size))
 
 
@@ -222,7 +210,7 @@ def list_my_items(
         stmt = stmt.where(Content.status == status)
     stmt = stmt.order_by(Content.created_at.desc(), Content.id.desc())
 
-    rows, total = paginate(db, stmt, page, page_size)
+    rows, total = paginate(db, stmt, page, page_size, options=ITEM_LOAD)
     return ok(Page(items=[to_card(c, show_reject_reason=True) for c in rows], total=total, page=page, page_size=page_size))
 
 

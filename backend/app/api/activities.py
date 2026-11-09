@@ -22,10 +22,11 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session, joinedload
 
-from app.api.clubs import escape_like, lock_club, require_president
+from app.api.clubs import lock_club, require_president
 from app.api.deps import get_current_user, get_optional_user
 from app.core.constants import CampusArea
 from app.core.exceptions import BizError
+from app.core.query import contains, paginate
 from app.db.session import get_db
 from app.models import Activity, ActivitySignup, Club, Content, User
 from app.schemas.activity import (
@@ -116,8 +117,11 @@ def to_detail(db: Session, c: Content, viewer: User | None) -> ActivityDetailOut
     )
 
 
+ACTIVITY_LOAD = (joinedload(Content.activity).joinedload(Activity.club).joinedload(Club.content),)
+
+
 def with_relations(stmt):
-    return stmt.options(joinedload(Content.activity).joinedload(Activity.club).joinedload(Club.content))
+    return stmt.options(*ACTIVITY_LOAD)
 
 
 def load_activity(db: Session, activity_id: int) -> Content | None:
@@ -135,9 +139,8 @@ def visible_activity(db: Session, activity_id: int, viewer: User | None) -> Cont
 
 
 def page_of(db: Session, stmt, page: int, page_size: int) -> tuple[list[Content], int]:
-    total = db.scalar(select(func.count()).select_from(stmt.order_by(None).subquery())) or 0
-    rows = db.scalars(with_relations(stmt).offset((page - 1) * page_size).limit(page_size)).all()
-    return list(rows), int(total)
+    """活动分页：取数据时带上 活动 → 社团 → 社团内容 的预加载。"""
+    return paginate(db, stmt, page, page_size, options=ACTIVITY_LOAD)
 
 
 def apply_when(stmt, when: When, now: datetime):
@@ -171,7 +174,7 @@ def list_activities(
         stmt = stmt.where(Content.campus_area == campus_area)
     if keyword:
         for word in keyword.split():
-            stmt = stmt.where(Content.search_text.ilike(f"%{escape_like(word)}%", escape="\\"))
+            stmt = stmt.where(Content.search_text.ilike(contains(word), escape="\\"))
     rows, total = page_of(db, apply_when(stmt, when, now), page, page_size)
     return ok(Page(items=[to_card(c, now) for c in rows], total=total, page=page, page_size=page_size))
 

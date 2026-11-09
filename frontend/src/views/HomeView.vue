@@ -5,7 +5,7 @@
 <script setup>
 import { ArrowRight, Search } from '@lucide/vue'
 import { motion } from 'motion-v'
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { activityApi, clubApi, itemApi } from '@/api'
@@ -15,6 +15,7 @@ import SignalFlag from '@/components/SignalFlag.vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
+import { monthDay, weekTime } from '@/lib/activity'
 import { timeAgo } from '@/lib/time'
 import { useMetaStore } from '@/stores/meta'
 
@@ -22,12 +23,58 @@ const router = useRouter()
 const meta = useMetaStore()
 
 const keyword = ref('')
-const arrivals = ref([]) // 到港公告：最新上架的物品
 const shelf = ref([]) // 闲置货架
 const recruitingClubs = ref([])
 const upcoming = ref([]) // 活动航班表：即将开始的活动
 const clubsLoaded = ref(false)
+const activitiesLoaded = ref(false)
 const loading = ref(true)
+
+/**
+ * 到港公告：把三个板块的最新动态排成一块牌子——
+ * 新上架的闲置（货）、正在招新的社团（招）、即将开始的活动（航）。
+ * 固定节奏：货、航、货、招、货；某类没有数据时用闲置补位，最多 5 行。
+ */
+const board = computed(() => {
+  const items = shelf.value.map((it) => ({
+    key: `i${it.id}`,
+    tag: '货',
+    tagClass: 'bg-white/15 text-white',
+    to: { name: 'item', params: { id: it.id } },
+    left: timeAgo(it.created_at),
+    title: it.title,
+    right: it.price === 0 ? '免费送' : `¥${it.price}`,
+    rightClass: it.price === 0 ? 'text-[#7FD1B0]' : 'text-buoy',
+  }))
+  const acts = upcoming.value.slice(0, 1).map((a) => ({
+    key: `a${a.id}`,
+    tag: '航',
+    tagClass: 'bg-signal text-white',
+    to: { name: 'activity', params: { id: a.id } },
+    left: monthDay(a.start_time),
+    title: a.title,
+    right: weekTime(a.start_time),
+    rightClass: 'text-white/70',
+  }))
+  const clubs = recruitingClubs.value.slice(0, 1).map((c) => ({
+    key: `c${c.id}`,
+    tag: '招',
+    tagClass: 'bg-buoy text-white',
+    to: { name: 'club', params: { id: c.id } },
+    left: '招新中',
+    title: c.title,
+    right: `${c.member_count} 人`,
+    rightClass: 'text-white/70',
+  }))
+  const order = [items, acts, items, clubs, items]
+  const rows = []
+  for (const src of order) {
+    const next = src.shift() ?? items.shift()
+    if (next) rows.push(next)
+  }
+  return rows
+})
+const boardReady = computed(() => !loading.value && clubsLoaded.value && activitiesLoaded.value)
 
 onMounted(async () => {
   meta.load().catch(() => {})
@@ -35,6 +82,7 @@ onMounted(async () => {
     .list({ when: 'upcoming', page_size: 5 })
     .then((data) => (upcoming.value = data.items))
     .catch(() => {})
+    .finally(() => (activitiesLoaded.value = true))
   const clubsTask = clubApi
     .list({ recruiting: true, page: 1, page_size: 20 })
     .then((data) => {
@@ -46,7 +94,6 @@ onMounted(async () => {
     })
   try {
     const data = await itemApi.list({ page: 1, page_size: 10, sort: 'latest' })
-    arrivals.value = data.items.slice(0, 5)
     shelf.value = data.items.slice(0, 5)
   } finally {
     loading.value = false
@@ -93,30 +140,33 @@ function flip(i) {
       </div>
 
       <!-- 到港公告牌 -->
-      <aside class="rounded-xl bg-ocean p-5 text-white shadow-[0_20px_40px_-20px_rgba(14,42,71,0.6)]" aria-label="最新到港">
+      <aside class="rounded-xl bg-ocean p-5 text-white shadow-[0_20px_40px_-20px_rgba(14,42,71,0.6)]" aria-label="到港公告：最新闲置、招新和活动">
         <div class="mb-3 flex items-center justify-between text-sm text-white/60">
           <span class="font-display text-lg text-white">到港公告</span>
           <span class="flex items-center gap-1.5"><span class="size-1.5 animate-pulse rounded-full bg-buoy" />实时</span>
         </div>
         <ol class="divide-y divide-white/10" style="perspective: 600px">
-          <template v-if="loading">
+          <template v-if="!boardReady">
             <li v-for="i in 5" :key="i" class="py-3"><div class="h-5 rounded bg-white/10" /></li>
           </template>
           <motion.li
-            v-for="(it, i) in arrivals"
+            v-for="(row, i) in board"
             v-else
-            :key="it.id"
+            :key="row.key"
             v-bind="flip(i)"
             class="origin-top"
           >
-            <router-link :to="{ name: 'item', params: { id: it.id } }" class="grid grid-cols-[5.5rem_1fr_auto] items-center gap-3 py-3 hover:text-buoy">
-              <span class="text-sm tabular-nums text-white/55">{{ timeAgo(it.created_at) }}</span>
-              <span class="truncate">{{ it.title }}</span>
-              <span v-if="it.price === 0" class="text-sm text-[#7FD1B0]">免费送</span>
-              <span v-else class="tabular-nums text-buoy">¥{{ it.price }}</span>
+            <router-link :to="row.to" class="grid grid-cols-[1.5rem_4.5rem_1fr_auto] items-center gap-3 py-3 hover:text-buoy">
+              <span class="grid size-6 place-items-center rounded text-xs font-semibold" :class="row.tagClass" aria-hidden="true">{{ row.tag }}</span>
+              <span class="text-sm tabular-nums text-white/55">{{ row.left }}</span>
+              <span class="truncate">{{ row.title }}</span>
+              <span class="text-sm tabular-nums" :class="row.rightClass">{{ row.right }}</span>
             </router-link>
           </motion.li>
         </ol>
+        <p class="mt-3 flex gap-4 border-t border-white/10 pt-3 text-xs text-white/50">
+          <span>货 · 新到闲置</span><span>招 · 社团招新</span><span>航 · 近期活动</span>
+        </p>
       </aside>
     </section>
 

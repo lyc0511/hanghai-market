@@ -18,9 +18,9 @@ from sqlalchemy import Date, cast, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_admin
-from app.api.items import escape_like
 from app.api.notifications import notify
 from app.core.exceptions import BizError
+from app.core.query import contains
 from app.db.session import get_db
 from app.models import (
     Activity,
@@ -133,7 +133,7 @@ def list_users(
 ) -> ApiResponse[Page[AdminUserOut]]:
     where = []
     if keyword and keyword.strip():
-        k = f"%{escape_like(keyword.strip())}%"
+        k = contains(keyword.strip())
         where.append(or_(User.student_no.like(k, escape="\\"), User.nickname.ilike(k, escape="\\")))
     if status:
         where.append(User.status == status)

@@ -29,6 +29,7 @@ from app.api.meta import ENUMS
 from app.api.upload import public_url
 from app.core.constants import CampusArea
 from app.core.exceptions import BizError
+from app.core.query import contains, paginate
 from app.db.session import get_db
 from app.models import Club, ClubApplication, ClubMember, Content, User
 from app.schemas.club import (
@@ -60,11 +61,6 @@ def shanghai_today() -> date:
     return datetime.now(LOCAL_TZ).date()
 
 
-def escape_like(s: str) -> str:
-    """转义 LIKE 通配符，让用户输入的 % 和 _ 按普通字符匹配。"""
-    return s.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-
-
 def is_recruiting(club: Club, today: date) -> bool:
     if club.recruit_status != "recruiting":
         return False
@@ -92,12 +88,6 @@ def logo_of(path: str | None) -> str | None:
 
 def build_search_text(title: str, summary: str | None, note: str | None, tags: list[str]) -> str:
     return " ".join([title, summary or "", note or "", *tags])
-
-
-def page_rows(db: Session, stmt, page: int, page_size: int):
-    total = db.scalar(select(func.count()).select_from(stmt.order_by(None).subquery())) or 0
-    rows = db.execute(stmt.offset((page - 1) * page_size).limit(page_size)).all()
-    return rows, int(total)
 
 
 def load_club(db: Session, club_id: int) -> Content | None:
@@ -239,7 +229,7 @@ def list_clubs(
     if keyword:
         for word in keyword.split():
             if word:
-                stmt = stmt.where(Content.search_text.ilike(f"%{escape_like(word)}%", escape="\\"))
+                stmt = stmt.where(Content.search_text.ilike(contains(word), escape="\\"))
     if club_type is not None:
         stmt = stmt.where(Club.club_type == club_type)
     if campus_area is not None:
@@ -251,7 +241,7 @@ def list_clubs(
     # 正在招新的排在前面，方便首页信号旗和目录第一眼看到
     stmt = stmt.order_by(recruiting_sql(today).desc(), Club.member_count.desc(), Content.id.asc())
 
-    rows, total = page_rows(db, stmt, page, page_size)
+    rows, total = paginate(db, stmt, page, page_size, scalars=False)
     cards = [to_card(content, club, president, today) for content, club, president in rows]
     return ok(Page(items=cards, total=total, page=page, page_size=page_size))
 
@@ -272,7 +262,7 @@ def my_clubs(
         .where(Content.type == "club", Content.status != "deleted")
         .order_by(ClubMember.role.desc(), Content.title.asc())
     )
-    rows, total = page_rows(db, stmt, page, page_size)
+    rows, total = paginate(db, stmt, page, page_size, scalars=False)
     items: list[MyClubOut] = []
     for content, club, president, role in rows:
         card = to_card(content, club, president, today)
@@ -346,7 +336,7 @@ def list_members(
         .where(ClubMember.club_id == content.id)
         .order_by(ClubMember.role.desc(), ClubMember.joined_at.asc())
     )
-    rows, total = page_rows(db, stmt, page, page_size)
+    rows, total = paginate(db, stmt, page, page_size, scalars=False)
     items = [
         MemberOut(
             user_id=member_user.id,
@@ -430,7 +420,7 @@ def list_applications(
     )
     if status is not None:
         stmt = stmt.where(ClubApplication.status == status)
-    rows, total = page_rows(db, stmt, page, page_size)
+    rows, total = paginate(db, stmt, page, page_size, scalars=False)
     return ok(
         Page(
             items=[to_application(app, applicant) for app, applicant in rows],
@@ -541,7 +531,7 @@ def my_applications(
     )
     if status is not None:
         stmt = stmt.where(ClubApplication.status == status)
-    rows, total = page_rows(db, stmt, page, page_size)
+    rows, total = paginate(db, stmt, page, page_size, scalars=False)
     items = [
         MyApplicationOut(
             id=app.id,
