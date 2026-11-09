@@ -7,6 +7,7 @@
 - **T02 登录认证**（注册、学号密码登录、JWT、当前用户、修改密码）
 - **T03 发布二手物品**（图片上传、发布物品进入待审核、物品详情；校区限定为黄埔 / 琶洲）
 - **T04 物品审核**（管理员审核列表、通过上架、驳回并附原因；通知卖家、记录管理日志）
+- **T05 物品列表与搜索**（关键词搜索、分类 / 校区 / 成色 / 价格筛选、四种排序、分页；我发布的物品）
 
 ## 技术栈
 
@@ -154,6 +155,8 @@ uv pip install -r requirements.txt --python .venv\Scripts\python.exe
 | GET | `/api/auth/me` | 当前登录用户（需登录） |
 | POST | `/api/auth/password` | 修改密码（需登录） |
 | POST | `/api/upload/image` | 上传图片（需登录，jpg/png/webp，≤5MB） |
+| GET | `/api/items` | 物品列表 / 搜索（只返回已上架，分页） |
+| GET | `/api/items/mine` | 我发布的物品，含待审核 / 已驳回（需登录） |
 | POST | `/api/items` | 发布物品（需登录，提交后为待审核） |
 | GET | `/api/items/{id}` | 物品详情（游客可看已上架的；卖家本人和管理员可看全部状态） |
 | GET | `/api/admin/items?status=pending` | 物品审核列表（管理员，分页；待审核按提交时间先到先审） |
@@ -214,3 +217,20 @@ pending（待审核）──通过──▶ online（已上架，所有人可见
 - 每次审核在同一个事务中完成：修改物品状态、写入 `notifications` 通知卖家、写入 `audit_logs` 管理日志
 - 审核前对物品行加锁（`SELECT ... FOR UPDATE`），两个管理员同时审核同一件物品时只有一个会成功
 - 分页接口统一返回 `{"items": [...], "total": 总条数, "page": 页码, "page_size": 每页条数}`
+
+## 物品列表与搜索
+
+`GET /api/items` 的查询参数（都可不填，填了才参与筛选）：
+
+| 参数 | 说明 |
+|---|---|
+| `keyword` | 关键词，在标题 + 描述 + 标签中模糊匹配；空格分隔多个词时需全部命中 |
+| `category_id` | 物品类目 id |
+| `campus_area` | `黄埔校区` / `琶洲校区` |
+| `condition` | `new` / `like_new` / `good` / `fair` |
+| `price_min` / `price_max` | 价格区间，0~0 即「免费送」 |
+| `sort` | `latest` 最新（默认）/ `price_asc` / `price_desc` / `popular` 最热 |
+| `page` / `page_size` | 页码 / 每页条数（最多 50） |
+
+- 搜索基于 `contents.search_text`（发布时由标题、描述、标签拼接），使用 `ILIKE`；用户输入的 `%`、`_` 会被转义，按普通字符匹配
+- 列表返回精简的「卡片」字段（封面为第一张图），完整信息走详情接口

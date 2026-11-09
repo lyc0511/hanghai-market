@@ -76,6 +76,25 @@ class SellerBrief(BaseModel):
     campus_area: str | None
 
 
+class ItemCardOut(BaseModel):
+    """列表里的一张物品卡片：只放列表页需要的字段，完整信息走详情接口。"""
+
+    id: int
+    title: str
+    price: float
+    original_price: float | None
+    condition: str
+    cover: str | None = Field(description="封面图完整地址（第一张图）")
+    campus_area: str | None
+    category_name: str | None
+    tags: list[str]
+    status: str
+    reject_reason: str | None = Field(description="仅「我发布的」列表中返回")
+    view_count: int
+    seller_nickname: str
+    created_at: datetime
+
+
 class ItemDetailOut(BaseModel):
     id: int
     title: str
