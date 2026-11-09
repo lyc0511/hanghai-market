@@ -133,9 +133,13 @@ async function onLeave() {
     danger: true,
   })
   if (!ok) return
-  await clubApi.leave(club.value.id)
-  toast.success('已退出社团')
-  await load()
+  try {
+    await clubApi.leave(club.value.id)
+    toast.success('已退出社团')
+    await load()
+  } catch {
+    /* 已不是成员等提示已由 http.js 弹出 */
+  }
 }
 
 function openEdit() {
