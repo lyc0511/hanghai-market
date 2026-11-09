@@ -86,9 +86,21 @@ def test_guide_question_without_tools(client, db, monkeypatch):
     assert r["code"] == 0 and r["data"]["cards"] == [] and "/publish" in r["data"]["reply"]
     sent = seen[0]["messages"]
     assert sent[0]["role"] == "system" and "使用说明" in sent[0]["content"]
-    assert [m["role"] for m in sent[1:]] == ["user", "assistant", "user"]
+    assert sent[1]["role"] == "system" and "未登录" in sent[1]["content"]
+    assert [m["role"] for m in sent[2:]] == ["user", "assistant", "user"]
     assert {t["function"]["name"] for t in seen[0]["tools"]} == {"search_items", "search_clubs", "search_activities"}
     assert last_log(db).intent == "guide"
+
+
+def test_static_prompt_is_shared_for_cache(make_user):
+    """省钱的关键：第一条系统消息对所有用户、每一天都完全相同，DeepSeek 才能命中缓存。"""
+    u1, _ = make_user("甲同学")
+    u2, _ = make_user("乙同学")
+    cats = ["教材", "数码"]
+    guest, a, b = (assistant.system_messages(u, cats) for u in (None, u1, u2))
+    assert guest[0] == a[0] == b[0]
+    assert "甲同学" not in a[0]["content"] and "甲同学" in a[1]["content"]
+    assert "今天是" not in a[0]["content"]
 
 
 def test_bad_tool_arguments_do_not_crash(client, monkeypatch):

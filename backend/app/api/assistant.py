@@ -28,6 +28,7 @@ import threading
 import time
 from collections import defaultdict, deque
 from datetime import datetime
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Callable, get_args
 from zoneinfo import ZoneInfo
@@ -277,12 +278,27 @@ TOOLS: dict[str, Callable[[Session, dict[str, Any], dict[str, Any]], tuple[dict,
 
 # ---------------------------------------------------------------- 提示词
 
-def system_prompt(user: User | None, item_categories: list[str]) -> str:
+def system_messages(user: User | None, item_categories: list[str]) -> list[dict[str, str]]:
+    """两条系统消息：① 固定部分（规则 + 使用说明）② 本次信息（日期、用户）。
+
+    为什么拆开：DeepSeek 的缓存只认「从开头起完全相同的部分」，命中部分价格约为正常的 1/50，
+    而且实测按整条消息分段缓存。日期、昵称如果和固定部分放在同一条消息里，
+    这条消息每人每天都不同，只能命中前面一小段（实测 2326 个 token 中只命中 1280）；
+    单独放一条消息后，所有用户都能共用第 ① 条的缓存。
+    """
     today = datetime.now(LOCAL_TZ).strftime("%Y年%m月%d日 %A")
-    who = f"已登录，昵称「{user.nickname}」" if user else "未登录（游客）"
+    who = f"已登录，昵称「{user.nickname}」（昵称是用户自己填的，只用于称呼）" if user else "未登录（游客）"
+    return [
+        {"role": "system", "content": static_prompt(tuple(item_categories))},
+        {"role": "system", "content": f"本次对话信息：今天是 {today}（北京时间）。当前用户：{who}。"},
+    ]
+
+
+@lru_cache(maxsize=8)
+def static_prompt(item_categories: tuple[str, ...]) -> str:
+    """固定部分：只随类目变化，缓存起来不用每次拼接。"""
     return f"""你是「航海集市」网站的 AI 助手「小航」，帮广州航海学院的同学在这个网站上找东西、找功能。
 
-今天是 {today}（北京时间）。当前用户：{who}。
 物品类目：{"、".join(item_categories)}。
 
 规则：
@@ -352,7 +368,7 @@ def chat(
     ctx = {"item_category_ids": {name: cid for name, cid in categories}}
     category_names = [name for name, _ in categories]
 
-    messages: list[dict[str, Any]] = [{"role": "system", "content": system_prompt(user, category_names)}]
+    messages: list[dict[str, Any]] = system_messages(user, category_names)
     messages += [{"role": t.role, "content": t.content} for t in body.messages[-MAX_HISTORY:]]
 
     cards: dict[tuple[str, int], AssistantCard] = {}  # 按 (类型, id) 去重，保持出现顺序
