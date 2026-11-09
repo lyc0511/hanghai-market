@@ -1,105 +1,157 @@
+<!-- 发布 / 编辑物品：网址里有 id 就是编辑模式（/items/:id/edit），会先把原内容填进表单 -->
 <script setup>
-import { showToast } from 'vant'
-import { computed, onMounted, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { ImagePlus, Loader2, X } from '@lucide/vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { toast } from 'vue-sonner'
 
 import { itemApi, uploadApi } from '@/api'
+import PageHeader from '@/components/PageHeader.vue'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Textarea } from '@/components/ui/textarea'
 import { useMetaStore } from '@/stores/meta'
 import { useUserStore } from '@/stores/user'
 
+const route = useRoute()
 const router = useRouter()
 const meta = useMetaStore()
 const user = useUserStore()
 
-const files = ref([]) // van-uploader 的文件列表，每项上传成功后带上 path
+const MAX_IMAGES = 9
+const MAX_MB = 5
+
+// 图片列表：每项 { url: 预览地址, path: 提交给后端的路径, status: uploading | done | failed }
+const images = ref([])
+const fileInput = ref()
 const form = reactive({
   title: '',
   summary: '',
-  categoryId: null,
+  categoryId: '',
   price: '',
   originalPrice: '',
   condition: 'good',
   campus: user.profile?.campus_area ?? '',
   tags: '',
 })
-const showCategory = ref(false)
-const showCampus = ref(false)
+const errors = reactive({})
+
+const editId = computed(() => route.params.id ?? null)
+const isEdit = computed(() => editId.value !== null)
+const loadingItem = ref(false)
 const submitting = ref(false)
 
-const categoryName = computed(() => meta.itemCategories.find((c) => c.id === form.categoryId)?.name ?? '')
-const categoryColumns = computed(() => meta.itemCategories.map((c) => ({ text: c.name, value: c.id })))
-const campusColumns = computed(() => (meta.enums?.campus_area ?? []).map((c) => ({ text: c, value: c })))
 const conditions = computed(() => Object.entries(meta.enums?.item_condition ?? {}))
-const uploading = computed(() => files.value.some((f) => f.status === 'uploading'))
+const uploading = computed(() => images.value.some((f) => f.status === 'uploading'))
+const tagList = computed(() => [...new Set(form.tags.split(/[\s,，、]+/).map((t) => t.trim()).filter(Boolean))])
 
-onMounted(() => meta.load().catch(() => {}))
+/** 详情接口返回的是完整地址，提交时要换回 /uploads/... 形式的 path */
+function toPath(url) {
+  const i = url.indexOf('/uploads/')
+  return i >= 0 ? url.slice(i) : url
+}
+
+async function loadForEdit() {
+  loadingItem.value = true
+  try {
+    const it = await itemApi.detail(editId.value)
+    if (!it.is_mine) {
+      toast.error('只能编辑自己发布的物品')
+      router.replace({ name: 'home' })
+      return
+    }
+    Object.assign(form, {
+      title: it.title,
+      summary: it.summary ?? '',
+      categoryId: it.category ? String(it.category.id) : '',
+      price: String(it.price),
+      originalPrice: it.original_price == null ? '' : String(it.original_price),
+      condition: it.condition,
+      campus: it.campus_area ?? '',
+      tags: it.tags.join(' '),
+    })
+    images.value = it.images.map((url) => ({ url, path: toPath(url), status: 'done' }))
+  } catch {
+    router.replace({ name: 'my-items' })
+  } finally {
+    loadingItem.value = false
+  }
+}
+
+onMounted(() => {
+  meta.load().catch(() => {})
+  if (isEdit.value) loadForEdit()
+})
 
 // 第一步：选好图片后立即上传，拿到 path
-async function afterRead(entry) {
-  const list = Array.isArray(entry) ? entry : [entry]
-  await Promise.all(
-    list.map(async (f) => {
-      f.status = 'uploading'
-      f.message = '上传中'
-      try {
-        const { path } = await uploadApi.image(f.file)
-        f.path = path
-        f.status = 'done'
-      } catch {
-        f.status = 'failed'
-        f.message = '上传失败'
-      }
-    }),
-  )
+async function onPick(e) {
+  const picked = [...e.target.files].slice(0, MAX_IMAGES - images.value.length)
+  e.target.value = '' // 清空，允许再次选择同一张图
+  for (const file of picked) {
+    if (file.size > MAX_MB * 1024 * 1024) {
+      toast.error(`「${file.name}」超过 ${MAX_MB}MB`)
+      continue
+    }
+    const entry = reactive({ url: URL.createObjectURL(file), path: '', status: 'uploading' })
+    images.value.push(entry)
+    uploadApi
+      .image(file)
+      .then(({ path }) => Object.assign(entry, { path, status: 'done' }))
+      .catch(() => (entry.status = 'failed'))
+  }
 }
 
-function onOversize() {
-  showToast('图片不能超过 5MB')
+function removeImage(i) {
+  images.value.splice(i, 1)
 }
 
-const tagList = computed(() =>
-  [...new Set(form.tags.split(/[\s,，、]+/).map((t) => t.trim()).filter(Boolean))],
-)
-
-const rules = {
-  title: [{ validator: (v) => v.trim().length >= 2 && v.trim().length <= 60, message: '标题 2–60 个字' }],
-  category: [{ validator: () => !!form.categoryId, message: '请选择分类' }],
-  price: [{ validator: (v) => v !== '' && Number(v) >= 0 && Number(v) <= 99999, message: '价格 0–99999，0 表示免费送' }],
-  originalPrice: [
-    {
-      // 原价为空时 Vant 会跳过非必填规则；填了才检查
-      validator: (v) => v === '' || v == null || Number(v) >= Number(form.price || 0),
-      message: '原价不能低于售价',
-    },
-  ],
-  tags: [{ validator: () => tagList.value.length <= 5 && tagList.value.every((t) => t.length <= 10), message: '最多 5 个标签，每个不超过 10 字' }],
+function validate() {
+  for (const k of Object.keys(errors)) delete errors[k]
+  const t = form.title.trim()
+  if (t.length < 2 || t.length > 60) errors.title = '标题 2–60 个字'
+  if (!images.value.some((f) => f.status === 'done')) errors.images = '至少上传一张图片'
+  if (!form.categoryId) errors.category = '请选择分类'
+  if (form.price === '' || Number(form.price) < 0 || Number(form.price) > 99999) errors.price = '售价 0–99999，填 0 表示免费送'
+  if (form.originalPrice !== '' && Number(form.originalPrice) < Number(form.price || 0)) errors.originalPrice = '原价不能低于售价'
+  if (tagList.value.length > 5 || tagList.value.some((x) => x.length > 10)) errors.tags = '最多 5 个标签，每个不超过 10 字'
+  return Object.keys(errors).length === 0
 }
+
+// 第一次点「发布」之后，再改任何字段都实时重新检查，改对了错误提示立刻消失
+const triedSubmit = ref(false)
+watch([form, images], () => triedSubmit.value && validate(), { deep: true })
 
 // 第二步：把表单和图片 path 一起提交
 async function onSubmit() {
-  const images = files.value.filter((f) => f.status === 'done').map((f) => f.path)
-  if (!images.length) {
-    showToast('请至少上传一张图片')
-    return
-  }
+  triedSubmit.value = true
   if (uploading.value) {
-    showToast('图片还在上传，请稍等')
+    toast('图片还在上传，稍等一下')
     return
   }
+  if (!validate()) return
   submitting.value = true
   try {
-    await itemApi.create({
+    const body = {
       title: form.title.trim(),
       summary: form.summary.trim(),
-      category_id: form.categoryId,
+      category_id: Number(form.categoryId),
       price: Number(form.price),
       original_price: form.originalPrice === '' ? null : Number(form.originalPrice),
       condition: form.condition,
-      images,
+      images: images.value.filter((f) => f.status === 'done').map((f) => f.path),
       tags: tagList.value,
       campus_area: form.campus || null,
-    })
-    showToast({ type: 'success', message: '已提交，等待管理员审核' })
+    }
+    if (isEdit.value) {
+      await itemApi.update(editId.value, body)
+      toast.success('已保存，等待管理员重新审核')
+    } else {
+      await itemApi.create(body)
+      toast.success('已提交，等待管理员审核')
+    }
     router.replace({ name: 'my-items' })
   } catch {
     /* 提示已由 http.js 弹出 */
@@ -110,179 +162,129 @@ async function onSubmit() {
 </script>
 
 <template>
-  <div class="publish">
-    <van-nav-bar title="发布闲置" left-arrow fixed placeholder @click-left="router.back()" />
+  <div class="container narrow">
+    <PageHeader :title="isEdit ? '编辑物品' : '发布闲置'" />
 
-    <van-form @submit="onSubmit">
-      <section class="block">
-        <van-field v-model="form.title" :rules="rules.title" placeholder="品牌型号、新旧程度，一句话说清楚" maxlength="60" class="title-field" />
-        <van-field
-          v-model="form.summary"
-          type="textarea"
-          rows="3"
-          autosize
-          maxlength="300"
-          show-word-limit
-          placeholder="描述一下使用情况、入手渠道、转手原因、交易方式……"
-        />
-        <div class="uploader">
-          <van-uploader
-            v-model="files"
-            multiple
-            :max-count="9"
-            :max-size="5 * 1024 * 1024"
-            accept="image/jpeg,image/png,image/webp"
-            :after-read="afterRead"
-            @oversize="onOversize"
-          />
-          <p class="hint">最多 9 张，第一张作为封面；支持 jpg、png、webp，每张不超过 5MB</p>
+    <div v-if="loadingItem" class="space-y-4"><Skeleton class="h-10" /><Skeleton class="h-32" /><Skeleton class="h-24" /></div>
+
+    <form v-else class="space-y-8" novalidate @submit.prevent="onSubmit">
+      <!-- 图片 -->
+      <section>
+        <Label class="text-base">照片</Label>
+        <p class="mt-1 text-sm text-muted-foreground">最多 {{ MAX_IMAGES }} 张，第一张作为封面；jpg、png、webp，每张不超过 {{ MAX_MB }}MB</p>
+        <div class="mt-3 grid grid-cols-3 gap-3 sm:grid-cols-5">
+          <div v-for="(f, i) in images" :key="f.url" class="group relative aspect-square overflow-hidden rounded-lg border bg-secondary">
+            <img :src="f.url" alt="" class="size-full object-cover" :class="f.status !== 'done' ? 'opacity-50' : ''" />
+            <span v-if="i === 0" class="absolute bottom-1 left-1 rounded bg-ocean/80 px-1.5 py-0.5 text-[11px] text-white">封面</span>
+            <Loader2 v-if="f.status === 'uploading'" class="absolute inset-0 m-auto size-6 animate-spin text-ocean" />
+            <span v-if="f.status === 'failed'" class="absolute inset-x-0 bottom-0 bg-destructive py-0.5 text-center text-[11px] text-white">上传失败</span>
+            <button
+              type="button"
+              class="absolute right-1 top-1 grid size-6 place-items-center rounded-full bg-ocean/70 text-white opacity-100 transition-opacity hover:bg-ocean sm:opacity-0 sm:group-hover:opacity-100"
+              aria-label="删除这张图"
+              @click="removeImage(i)"
+            >
+              <X class="size-3.5" />
+            </button>
+          </div>
+          <button
+            v-if="images.length < MAX_IMAGES"
+            type="button"
+            class="flex aspect-square flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed text-muted-foreground transition-colors hover:border-signal hover:text-signal"
+            @click="fileInput.click()"
+          >
+            <ImagePlus class="size-6" />
+            <span class="text-xs">添加照片</span>
+          </button>
+        </div>
+        <input ref="fileInput" type="file" accept="image/jpeg,image/png,image/webp" multiple class="hidden" @change="onPick" />
+        <p v-if="errors.images" class="mt-2 text-sm text-destructive">{{ errors.images }}</p>
+      </section>
+
+      <!-- 标题与描述 -->
+      <section class="space-y-4">
+        <div class="space-y-1.5">
+          <Label for="title" class="text-base">标题</Label>
+          <Input id="title" v-model="form.title" maxlength="60" placeholder="品牌型号和新旧程度，一句话说清楚" class="h-11 text-base" :aria-invalid="!!errors.title" />
+          <p v-if="errors.title" class="text-sm text-destructive">{{ errors.title }}</p>
+        </div>
+        <div class="space-y-1.5">
+          <Label for="summary">描述（选填）</Label>
+          <Textarea id="summary" v-model="form.summary" rows="4" maxlength="300" placeholder="使用情况、入手渠道、转手原因、交易方式……" />
+          <p class="text-right text-xs text-muted-foreground">{{ form.summary.length }}/300</p>
         </div>
       </section>
 
-      <section class="block">
-        <!-- 用了自定义输入框，要把值同时传给 van-field，校验规则才能拿到 -->
-        <van-field label="售价" :model-value="form.price" :rules="rules.price" required>
-          <template #input>
-            <span class="yuan">¥</span>
-            <input v-model="form.price" type="number" inputmode="decimal" min="0" placeholder="0 表示免费送" class="num" />
-          </template>
-        </van-field>
-        <van-field label="原价" :model-value="form.originalPrice" :rules="rules.originalPrice">
-          <template #input>
-            <span class="yuan">¥</span>
-            <input v-model="form.originalPrice" type="number" inputmode="decimal" min="0" placeholder="选填" class="num" />
-          </template>
-        </van-field>
-        <van-field label="成色" required>
-          <template #input>
-            <div class="chips">
-              <button
-                v-for="[value, text] in conditions"
-                :key="value"
-                type="button"
-                class="chip"
-                :class="{ active: form.condition === value }"
-                @click="form.condition = value"
-              >
-                {{ text }}
-              </button>
-            </div>
-          </template>
-        </van-field>
-        <van-field
-          :model-value="categoryName"
-          label="分类"
-          placeholder="请选择"
-          is-link
-          readonly
-          required
-          :rules="rules.category"
-          @click="showCategory = true"
-        />
-        <van-field
-          :model-value="form.campus"
-          label="交易校区"
-          placeholder="请选择"
-          is-link
-          readonly
-          @click="showCampus = true"
-        />
-        <van-field v-model="form.tags" label="标签" placeholder="用空格分隔，如：考研 数学" :rules="rules.tags" />
+      <!-- 价格与属性 -->
+      <section class="grid gap-x-6 gap-y-5 sm:grid-cols-2">
+        <div class="space-y-1.5">
+          <Label for="price">售价</Label>
+          <div class="relative">
+            <span class="absolute left-3 top-1/2 -translate-y-1/2 font-semibold text-buoy">¥</span>
+            <Input id="price" v-model="form.price" type="number" inputmode="decimal" min="0" placeholder="填 0 表示免费送" class="h-10 pl-7" :aria-invalid="!!errors.price" />
+          </div>
+          <p v-if="errors.price" class="text-sm text-destructive">{{ errors.price }}</p>
+        </div>
+        <div class="space-y-1.5">
+          <Label for="original">原价（选填）</Label>
+          <div class="relative">
+            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">¥</span>
+            <Input id="original" v-model="form.originalPrice" type="number" inputmode="decimal" min="0" placeholder="买的时候多少钱" class="h-10 pl-7" :aria-invalid="!!errors.originalPrice" />
+          </div>
+          <p v-if="errors.originalPrice" class="text-sm text-destructive">{{ errors.originalPrice }}</p>
+        </div>
+        <div class="space-y-1.5">
+          <Label>分类</Label>
+          <Select v-model="form.categoryId">
+            <SelectTrigger class="h-10 w-full" :aria-invalid="!!errors.category"><SelectValue placeholder="选择分类" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem v-for="c in meta.itemCategories" :key="c.id" :value="String(c.id)">{{ c.name }}</SelectItem>
+            </SelectContent>
+          </Select>
+          <p v-if="errors.category" class="text-sm text-destructive">{{ errors.category }}</p>
+        </div>
+        <div class="space-y-1.5">
+          <Label>交易校区</Label>
+          <Select v-model="form.campus">
+            <SelectTrigger class="h-10 w-full"><SelectValue placeholder="选择校区" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem v-for="c in meta.enums?.campus_area ?? []" :key="c" :value="c">{{ c }}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div class="space-y-1.5 sm:col-span-2">
+          <Label>成色</Label>
+          <div class="flex flex-wrap gap-2" role="radiogroup" aria-label="成色">
+            <button
+              v-for="[v, t] in conditions"
+              :key="v"
+              type="button"
+              role="radio"
+              :aria-checked="form.condition === v"
+              class="rounded-full border px-4 py-1.5 text-sm transition-colors"
+              :class="form.condition === v ? 'border-ocean bg-ocean text-white' : 'hover:border-ocean'"
+              @click="form.condition = v"
+            >
+              {{ t }}
+            </button>
+          </div>
+        </div>
+        <div class="space-y-1.5 sm:col-span-2">
+          <Label for="tags">标签（选填）</Label>
+          <Input id="tags" v-model="form.tags" placeholder="用空格分隔，如：考研 数学" class="h-10" :aria-invalid="!!errors.tags" />
+          <p v-if="errors.tags" class="text-sm text-destructive">{{ errors.tags }}</p>
+        </div>
       </section>
 
-      <div class="submit">
-        <van-button round block type="primary" native-type="submit" :loading="submitting" :disabled="uploading">
-          发布
-        </van-button>
-        <p class="hint center">发布后需管理员审核，通过后其他同学才能看到</p>
+      <div class="border-t pt-6">
+        <Button type="submit" size="lg" class="h-11 w-full text-base sm:w-auto sm:px-10" :disabled="submitting || uploading">
+          <Loader2 v-if="submitting" class="animate-spin" />
+          {{ isEdit ? '保存并重新提交审核' : '发布' }}
+        </Button>
+        <p class="mt-3 text-sm text-muted-foreground">
+          {{ isEdit ? '修改后需要重新审核；进行中的交易意向会自动关闭并通知买家。' : '发布后需要管理员审核，通过后其他同学才能看到。' }}
+        </p>
       </div>
-    </van-form>
-
-    <van-popup v-model:show="showCategory" round position="bottom">
-      <van-picker
-        title="选择分类"
-        :columns="categoryColumns"
-        @confirm="({ selectedValues }) => ((form.categoryId = selectedValues[0]), (showCategory = false))"
-        @cancel="showCategory = false"
-      />
-    </van-popup>
-    <van-popup v-model:show="showCampus" round position="bottom">
-      <van-picker
-        title="交易校区"
-        :columns="campusColumns"
-        @confirm="({ selectedValues }) => ((form.campus = selectedValues[0]), (showCampus = false))"
-        @cancel="showCampus = false"
-      />
-    </van-popup>
+    </form>
   </div>
 </template>
-
-<style scoped>
-.publish {
-  padding-bottom: 32px;
-}
-.block {
-  background: var(--bg-card);
-  margin: 10px var(--page-x) 0;
-  border-radius: var(--radius);
-  overflow: hidden;
-}
-.title-field {
-  --van-field-input-text-color: var(--text-1);
-  font-size: 16px;
-  font-weight: 500;
-}
-.uploader {
-  padding: 4px 16px 12px;
-}
-.hint {
-  margin: 4px 0 0;
-  color: var(--text-3);
-  font-size: 12px;
-}
-.center {
-  text-align: center;
-  margin-top: 10px;
-}
-.yuan {
-  color: var(--accent);
-  font-weight: 600;
-  margin-right: 4px;
-}
-.num {
-  flex: 1;
-  min-width: 0;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  font: inherit;
-  color: var(--text-1);
-}
-.num::placeholder {
-  color: var(--text-3);
-}
-.chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.chip {
-  border: 1px solid var(--border);
-  background: var(--bg-card);
-  color: var(--text-2);
-  border-radius: 999px;
-  padding: 3px 10px;
-  font-size: 12px;
-  font-family: inherit;
-  cursor: pointer;
-}
-.chip.active {
-  border-color: var(--brand);
-  background: var(--brand-soft);
-  color: var(--brand-dark);
-  font-weight: 500;
-}
-.submit {
-  padding: 20px var(--page-x) 0;
-}
-</style>

@@ -89,6 +89,7 @@ class ItemCardOut(BaseModel):
     category_name: str | None
     tags: list[str]
     status: str
+    sold: bool = Field(description="是否已售出（成交后自动下架）")
     reject_reason: str | None = Field(description="仅「我发布的」列表中返回")
     view_count: int
     seller_nickname: str

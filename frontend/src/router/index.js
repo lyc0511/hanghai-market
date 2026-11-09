@@ -3,8 +3,7 @@
  * meta.auth = true 的页面需要登录，未登录时先跳到登录页，登录后再回来。
  * meta.admin = true 的页面只有管理员能进。
  */
-import { showToast } from 'vant'
-import 'vant/es/toast/style'
+import { toast } from 'vue-sonner'
 import { createRouter, createWebHistory } from 'vue-router'
 
 import { useUserStore } from '@/stores/user'
@@ -12,13 +11,17 @@ import { useUserStore } from '@/stores/user'
 const routes = [
   {
     path: '/',
-    component: () => import('@/layouts/MobileLayout.vue'),
+    component: () => import('@/layouts/SiteLayout.vue'),
     children: [
-      { path: '', name: 'home', component: () => import('@/views/HomeView.vue'), meta: { title: '首页', tab: true } },
+      { path: '', name: 'home', component: () => import('@/views/HomeView.vue'), meta: { title: '首页' } },
+      { path: 'market', name: 'market', component: () => import('@/views/MarketView.vue'), meta: { title: '二手交易' } },
+      { path: 'clubs', name: 'clubs', component: () => import('@/views/ComingSoonView.vue'), meta: { title: '社团', section: 'clubs' } },
+      { path: 'activities', name: 'activities', component: () => import('@/views/ComingSoonView.vue'), meta: { title: '活动', section: 'activities' } },
       { path: 'publish', name: 'publish', component: () => import('@/views/PublishView.vue'), meta: { title: '发布闲置', auth: true } },
-      { path: 'me', name: 'me', component: () => import('@/views/MeView.vue'), meta: { title: '我的', tab: true, auth: true } },
+      { path: 'me', name: 'me', component: () => import('@/views/MeView.vue'), meta: { title: '个人中心', auth: true } },
       { path: 'me/items', name: 'my-items', component: () => import('@/views/MyItemsView.vue'), meta: { title: '我发布的', auth: true } },
       { path: 'me/intents', name: 'my-intents', component: () => import('@/views/MyIntentsView.vue'), meta: { title: '我的意向', auth: true } },
+      { path: 'items/:id/edit', name: 'item-edit', component: () => import('@/views/PublishView.vue'), meta: { title: '编辑物品', auth: true } },
       { path: 'items/:id', name: 'item', component: () => import('@/views/ItemDetailView.vue'), meta: { title: '物品详情' } },
     ],
   },
@@ -56,7 +59,7 @@ router.beforeEach(async (to) => {
     }
   }
   if (to.meta.admin && !user.isAdmin) {
-    showToast('需要管理员账号')
+    toast.error('需要管理员账号')
     return { name: 'home' }
   }
 })

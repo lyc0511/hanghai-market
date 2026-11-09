@@ -11,6 +11,9 @@
 - **T06 个人资料与交易意向**（微信号 AES-GCM 加密存储；发起 / 接受 / 拒绝 / 取消 / 成交，接受后双方互看微信号）
 - **F01 前端框架**（海蓝色设计规范、请求封装、登录状态、手机端布局；登录注册、首页列表搜索、物品详情、发起意向、个人中心）
 - **F02 二手交易页面**（发布物品、我发布的、我的意向（接受 / 拒绝 / 取消 / 成交 / 复制微信号）、电脑端管理后台物品审核）
+- **F03 网站改版**（电脑网站布局：顶部导航 + 右上角登录弹窗；首页横幅 + 二手 / 社团 / 活动三大板块；二手交易页宽屏筛选与分页；详情页左右两栏；手机端自动单列）
+- **F04 前端重做（shadcn-vue）**（「港口公告牌」设计：港口色板 + 得意黑标题字体；首页到港公告牌翻牌动画；二手市场筛选网格重排动画；全站 shadcn 组件，移除 Vant）
+- **T07 物品管理**（卖家编辑（重新审核）、下架、重新上架、软删除；进行中的意向自动关闭并通知买家；前后端同步）
 
 ## 技术栈
 
@@ -20,7 +23,7 @@
 | 数据库 | PostgreSQL 17（不使用 pgvector，向量以 JSON 文本存放在 `contents.embedding_text`） |
 | 安全 | bcrypt 5（直接调用，不用 passlib）· PyJWT |
 | 包管理 | uv（后端）· npm（前端） |
-| 前端 | Vue 3 · Vite · Vue Router · Pinia · Axios · Vant 4（手机端）· Element Plus（管理后台） |
+| 前端 | Vue 3 · Vite · Vue Router · Pinia · Axios · Tailwind CSS 4 · shadcn-vue（reka-ui）· motion-v 动画 · Element Plus（仅管理后台） |
 
 ## 目录结构
 
@@ -160,6 +163,8 @@ npm run dev
 | 40301 | 无权操作该意向 |
 | 40903 | 已对该物品发起过意向 |
 | 40904 | 意向当前状态不能执行此操作 |
+| 40302 | 无权操作该物品（不是自己发布的） |
+| 40905 | 物品当前状态不能执行此操作（如已售出不能编辑） |
 | 42202 | 需要先在个人资料中填写微信号 |
 | 42203 | 不能对自己的物品发起意向 |
 | 42204 | 物品不在售 |
@@ -183,6 +188,10 @@ npm run dev
 | GET | `/api/items/mine` | 我发布的物品，含待审核 / 已驳回（需登录） |
 | POST | `/api/items` | 发布物品（需登录，提交后为待审核） |
 | GET | `/api/items/{id}` | 物品详情（游客可看已上架的；卖家本人和管理员可看全部状态） |
+| PUT | `/api/items/{id}` | 编辑物品（本人，提交后重新审核） |
+| POST | `/api/items/{id}/offline` | 下架（本人） |
+| POST | `/api/items/{id}/relist` | 重新上架（本人，需重新审核；已售出的不行） |
+| DELETE | `/api/items/{id}` | 删除（本人，软删除） |
 | POST | `/api/intents` | 发起交易意向（买家） |
 | GET | `/api/intents/mine?role=buyer\|seller` | 我的意向（我发起的 / 我收到的） |
 | POST | `/api/intents/{id}/accept` | 接受意向（卖家），双方可见微信号 |
@@ -287,12 +296,28 @@ pending ──卖家接受──▶ accepted ──卖家标记成交──▶ c
 
 ```
 frontend/src/
-├── styles/theme.css     # 设计规范：颜色、圆角、间距只在这里定义，页面用 var(--xxx)
+├── styles/main.css      # 设计规范：港口色板 6 色 + 字体，映射为 shadcn 语义变量和 Tailwind 工具类（bg-ocean、text-buoy、font-display）
+├── styles/theme.css     # 旧变量，仅管理后台（Element Plus）使用
+├── components/ui/       # shadcn-vue 组件（代码属于项目，可直接修改）
+├── composables/confirm.js # 全站共用确认弹窗：await confirm({...})
 ├── api/http.js          # 请求封装：自动带令牌、统一处理 code、401 跳登录
 ├── api/index.js         # 接口清单：一个函数对应一个后端接口
 ├── stores/              # Pinia：user（登录状态）、meta（字典数据）
 ├── router/index.js      # 路由与登录守卫（meta.auth）
-├── layouts/             # MobileLayout：手机端外壳 + 底部标签栏；AdminLayout：电脑端管理后台
-├── components/          # ItemCard 等可复用组件
+├── layouts/             # SiteLayout：网站外壳（顶部导航、右上角登录、页脚，响应式）；AdminLayout：管理后台
+├── components/          # AppHeader 顶部导航、LoginForm 登录表单（弹窗与登录页共用）、PageHeader、ItemCard
 └── views/               # 页面；views/admin/ 为管理后台页面（/admin，仅管理员）
 ```
+
+## 卖家管理物品
+
+```
+编辑       待审核 / 在售 / 已驳回 / 已下架(未售出) ──▶ 待审核（内容变了必须重新审核）
+下架       待审核 / 在售 / 已驳回 ──▶ 已下架
+重新上架   已下架(未售出) ──▶ 待审核
+删除       任意状态 ──▶ deleted（软删除）
+```
+
+- 任何编辑都回到待审核，防止「先发正常内容过审、再改成违规内容」
+- 编辑、下架、删除时，该物品上待处理和已接受的意向自动关闭并通知买家
+- 删除是软删除：只把状态改为 `deleted`，数据和成交记录保留，便于追溯纠纷

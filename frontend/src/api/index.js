@@ -30,6 +30,10 @@ export const itemApi = {
   detail: (id) => http.get(`/items/${id}`),
   mine: (params) => http.get('/items/mine', { params }),
   create: (body) => http.post('/items', body),
+  update: (id, body) => http.put(`/items/${id}`, body),
+  offline: (id) => http.post(`/items/${id}/offline`),
+  relist: (id) => http.post(`/items/${id}/relist`),
+  remove: (id) => http.delete(`/items/${id}`),
 }
 
 export const intentApi = {

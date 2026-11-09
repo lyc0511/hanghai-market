@@ -1,7 +1,6 @@
 <!-- 管理后台外壳（电脑端）：左侧菜单 + 顶栏 + 内容区，使用 Element Plus -->
 <script setup>
 import { Goods, HomeFilled, SwitchButton } from '@element-plus/icons-vue'
-import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import { useRoute, useRouter } from 'vue-router'
 
 import { useUserStore } from '@/stores/user'
@@ -17,8 +16,6 @@ function logout() {
 </script>
 
 <template>
-  <!-- Element Plus 默认英文，这里统一切换为中文（分页、弹窗按钮等） -->
-  <el-config-provider :locale="zhCn">
   <el-container class="admin">
     <el-aside width="208px" class="aside">
       <div class="logo">
@@ -51,7 +48,6 @@ function logout() {
       </el-main>
     </el-container>
   </el-container>
-  </el-config-provider>
 </template>
 
 <style scoped>
@@ -104,7 +100,7 @@ function logout() {
 .header {
   height: 64px;
   background: var(--bg-card);
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--line);
   display: flex;
   align-items: center;
   justify-content: space-between;

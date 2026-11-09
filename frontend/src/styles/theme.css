@@ -1,34 +1,38 @@
 /*
- * 设计规范（Design Tokens）：全站的颜色、圆角、间距、字号只在这里定义。
- * 页面里一律用 var(--xxx)，不直接写色值，这样改主题只需改这一个文件。
+ * 旧版设计变量：目前只给管理后台（Element Plus）使用。
+ * 网站页面的设计规范见 main.css（港口色板 + Tailwind 主题）。
  */
 :root {
   /* 品牌色：海蓝，呼应「航海」 */
-  --brand: #1d6fd8;
-  --brand-dark: #0f4c9c;
-  --brand-soft: #e8f1fd;
+  --brand: #1d5fd1;
+  --brand-dark: #0e2a47;
+  --brand-soft: #e8eef5;
   /* 强调色：价格、促销等需要吸引注意的地方 */
-  --accent: #f2672e;
-  --accent-soft: #fff1ea;
+  --hot: #f26b21;
+  --hot-soft: #fff1ea;
   /* 状态色 */
-  --success: #16a36a;
+  --success: #2e8b6e;
   --warning: #e8a317;
   --danger: #e5484d;
 
   /* 文字 */
-  --text-1: #17202b; /* 标题、正文 */
-  --text-2: #5b6573; /* 次要信息 */
-  --text-3: #98a1ad; /* 提示、占位 */
+  --text-1: #0e2a47; /* 标题、正文 */
+  --text-2: #5b6b7d; /* 次要信息 */
+  --text-3: #8394a6; /* 提示、占位 */
 
   /* 背景与边框 */
-  --bg-page: #f3f5f8;
+  --bg-page: #f5f7f6;
   --bg-card: #ffffff;
-  --border: #e6e9ee;
+  --line: #d7dee6;
+
+  /* 网站布局：内容区最大宽度、顶栏高度 */
+  --container: 1200px;
+  --header-h: 60px;
 
   /* 圆角、间距、阴影 */
-  --radius-sm: 8px;
-  --radius: 12px;
-  --radius-lg: 16px;
+  --r-sm: 8px;
+  --r: 12px;
+  --r-lg: 16px;
   --gap: 12px;
   --page-x: 14px; /* 页面左右留白 */
   --shadow-card: 0 1px 2px rgba(23, 32, 43, 0.04), 0 4px 14px rgba(23, 32, 43, 0.05);
@@ -36,16 +40,7 @@
   /* 字体：优先系统中文字体 */
   --font: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
 
-  /* 把品牌色同步给 Vant 和 Element Plus，组件库自动跟随主题 */
-  --van-primary-color: var(--brand);
-  --van-danger-color: var(--danger);
-  --van-success-color: var(--success);
-  --van-warning-color: var(--warning);
-  --van-text-color: var(--text-1);
-  --van-background: var(--bg-page);
-  --van-border-color: var(--border);
-  --van-radius-md: var(--radius-sm);
-  --van-tabbar-item-active-color: var(--brand);
+  /* 管理后台（Element Plus）跟随主题色 */
   --el-color-primary: var(--brand);
 }
 
@@ -73,9 +68,27 @@ a {
   text-decoration: none;
 }
 
+/* 页面内容容器：宽屏居中，窄屏左右留白 */
+.container {
+  width: 100%;
+  max-width: var(--container);
+  margin: 0 auto;
+  padding: 0 20px;
+}
+/* 表单、列表类页面用的窄容器 */
+.narrow {
+  max-width: 760px;
+  margin: 0 auto;
+}
+@media (max-width: 767px) {
+  .container {
+    padding: 0 var(--page-x);
+  }
+}
+
 /* 价格：统一的样式 */
 .price {
-  color: var(--accent);
+  color: var(--hot);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }

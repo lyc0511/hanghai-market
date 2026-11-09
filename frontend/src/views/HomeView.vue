@@ -1,193 +1,156 @@
+<!--
+  首页：标题 + 搜索（主角）、到港公告牌（全站唯一的入场动画）、闲置货架、社团、活动航班表。
+  三个板块各用不同的形式，不做成三张一样的卡片。
+-->
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { ArrowRight, Search } from '@lucide/vue'
+import { motion } from 'motion-v'
+import { onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 
 import { itemApi } from '@/api'
 import ItemCard from '@/components/ItemCard.vue'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Skeleton } from '@/components/ui/skeleton'
+import { timeAgo } from '@/lib/time'
 import { useMetaStore } from '@/stores/meta'
 
+const router = useRouter()
 const meta = useMetaStore()
-const PAGE_SIZE = 20
 
-// 筛选条件：对应后端 GET /api/items 的查询参数
-const filters = reactive({ keyword: '', category_id: 0, campus_area: '', sort: 'latest' })
-const keywordInput = ref('')
+const keyword = ref('')
+const arrivals = ref([]) // 到港公告：最新上架的物品
+const shelf = ref([]) // 闲置货架
+const loading = ref(true)
 
-const items = ref([])
-const page = ref(0)
-const total = ref(0)
-const loading = ref(false)
-const finished = ref(false)
-const refreshing = ref(false)
-const error = ref(false)
-
-const campusOptions = computed(() => [
-  { text: '全部校区', value: '' },
-  ...(meta.enums?.campus_area ?? []).map((c) => ({ text: c, value: c })),
-])
-const sortOptions = [
-  { text: '最新发布', value: 'latest' },
-  { text: '价格从低到高', value: 'price_asc' },
-  { text: '价格从高到低', value: 'price_desc' },
-  { text: '最多浏览', value: 'popular' },
-]
-
-function buildParams() {
-  const p = { page: page.value + 1, page_size: PAGE_SIZE, sort: filters.sort }
-  if (filters.keyword) p.keyword = filters.keyword
-  if (filters.category_id) p.category_id = filters.category_id
-  if (filters.campus_area) p.campus_area = filters.campus_area
-  return p
-}
-
-// van-list 滚动到底部时自动调用，加载下一页
-async function loadMore() {
+onMounted(async () => {
+  meta.load().catch(() => {})
   try {
-    const data = await itemApi.list(buildParams())
-    if (refreshing.value) {
-      items.value = []
-      refreshing.value = false
-    }
-    items.value.push(...data.items)
-    page.value = data.page
-    total.value = data.total
-    finished.value = items.value.length >= data.total
-  } catch {
-    error.value = true
+    const data = await itemApi.list({ page: 1, page_size: 10, sort: 'latest' })
+    arrivals.value = data.items.slice(0, 5)
+    shelf.value = data.items.slice(0, 5)
   } finally {
     loading.value = false
   }
-}
-
-// 条件变化时从第一页重新加载
-function reload() {
-  items.value = []
-  page.value = 0
-  finished.value = false
-  error.value = false
-  loading.value = true
-  loadMore()
-}
+})
 
 function onSearch() {
-  filters.keyword = keywordInput.value.trim()
-  reload()
+  const k = keyword.value.trim()
+  router.push({ name: 'market', query: k ? { keyword: k } : {} })
 }
 
-function onRefresh() {
-  page.value = 0
-  finished.value = false
-  loadMore()
+// 公告牌逐行翻下：每行晚 0.12 秒，绕 X 轴从 -90° 翻到 0°，像机场航班牌
+function flip(i) {
+  return {
+    initial: { rotateX: -90, opacity: 0 },
+    animate: { rotateX: 0, opacity: 1 },
+    transition: { delay: 0.25 + i * 0.12, duration: 0.45, ease: [0.22, 1, 0.36, 1] },
+  }
 }
-
-onMounted(() => meta.load().catch(() => {}))
 </script>
 
 <template>
-  <div class="home">
-    <header class="top">
-      <div class="brand">
-        <span class="name">航海集市</span>
-        <span class="sub">校内二手 · 闲置流转</span>
-      </div>
-      <van-search
-        v-model="keywordInput"
-        placeholder="搜索教材、数码、生活用品"
-        shape="round"
-        background="transparent"
-        class="search"
-        @search="onSearch"
-        @clear="onSearch"
-      />
-    </header>
-
-    <div class="sticky">
-      <van-tabs
-        v-model:active="filters.category_id"
-        shrink
-        line-width="18"
-        :ellipsis="false"
-        @change="reload"
-      >
-        <van-tab title="全部" :name="0" />
-        <van-tab v-for="c in meta.itemCategories" :key="c.id" :title="c.name" :name="c.id" />
-      </van-tabs>
-      <van-dropdown-menu class="filters">
-        <van-dropdown-item v-model="filters.campus_area" :options="campusOptions" @change="reload" />
-        <van-dropdown-item v-model="filters.sort" :options="sortOptions" @change="reload" />
-      </van-dropdown-menu>
-    </div>
-
-    <van-pull-refresh v-model="refreshing" @refresh="onRefresh">
-      <van-list
-        v-model:loading="loading"
-        v-model:error="error"
-        :finished="finished"
-        :finished-text="items.length ? '没有更多了' : ''"
-        error-text="加载失败，点击重试"
-        :offset="200"
-        @load="loadMore"
-      >
-        <p v-if="filters.keyword && !loading" class="result-hint">
-          「{{ filters.keyword }}」共找到 {{ total }} 件
+  <div class="container">
+    <!-- 第一屏：标题 + 搜索 / 到港公告牌 -->
+    <section class="grid items-center gap-8 lg:grid-cols-[1.2fr_1fr] lg:gap-12">
+      <div>
+        <h1 class="font-display text-5xl leading-[1.1] text-ocean sm:text-6xl">
+          今天港口<br />到了什么货？
+        </h1>
+        <p class="mt-4 max-w-md text-base leading-relaxed text-muted-foreground">
+          二手闲置、社团招新、校园活动，在广航同学之间流转。看中了就发起意向，卖家同意后加微信面交。
         </p>
-        <div class="grid">
-          <ItemCard v-for="it in items" :key="it.id" :item="it" />
+        <form class="mt-7 flex max-w-lg items-center gap-2 rounded-full border-2 border-ocean bg-white p-1.5 pl-5" role="search" @submit.prevent="onSearch">
+          <Search class="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <Input
+            v-model="keyword"
+            placeholder="搜教材、自行车、耳机……"
+            class="h-10 border-0 bg-transparent px-1 text-base shadow-none focus-visible:ring-0"
+            aria-label="搜索闲置物品"
+          />
+          <Button type="submit" class="h-10 rounded-full px-6 text-base">搜索</Button>
+        </form>
+      </div>
+
+      <!-- 到港公告牌 -->
+      <aside class="rounded-xl bg-ocean p-5 text-white shadow-[0_20px_40px_-20px_rgba(14,42,71,0.6)]" aria-label="最新到港">
+        <div class="mb-3 flex items-center justify-between text-sm text-white/60">
+          <span class="font-display text-lg text-white">到港公告</span>
+          <span class="flex items-center gap-1.5"><span class="size-1.5 animate-pulse rounded-full bg-buoy" />实时</span>
         </div>
-        <van-empty v-if="finished && !items.length" image="search" description="没有找到相关物品" />
-      </van-list>
-    </van-pull-refresh>
+        <ol class="divide-y divide-white/10" style="perspective: 600px">
+          <template v-if="loading">
+            <li v-for="i in 5" :key="i" class="py-3"><div class="h-5 rounded bg-white/10" /></li>
+          </template>
+          <motion.li
+            v-for="(it, i) in arrivals"
+            v-else
+            :key="it.id"
+            v-bind="flip(i)"
+            class="origin-top"
+          >
+            <router-link :to="{ name: 'item', params: { id: it.id } }" class="grid grid-cols-[5.5rem_1fr_auto] items-center gap-3 py-3 hover:text-buoy">
+              <span class="text-sm tabular-nums text-white/55">{{ timeAgo(it.created_at) }}</span>
+              <span class="truncate">{{ it.title }}</span>
+              <span v-if="it.price === 0" class="text-sm text-[#7FD1B0]">免费送</span>
+              <span v-else class="tabular-nums text-buoy">¥{{ it.price }}</span>
+            </router-link>
+          </motion.li>
+        </ol>
+      </aside>
+    </section>
+
+    <!-- 闲置货架 -->
+    <section class="mt-16">
+      <div class="mb-5 flex items-end justify-between">
+        <h2 class="font-display text-3xl text-ocean">闲置货架</h2>
+        <router-link :to="{ name: 'market' }" class="flex items-center gap-1 text-sm text-signal hover:underline">
+          去二手市场<ArrowRight class="size-4" />
+        </router-link>
+      </div>
+      <div class="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-5">
+        <template v-if="loading">
+          <div v-for="i in 5" :key="i"><Skeleton class="aspect-square rounded-lg" /><Skeleton class="mt-2 h-4 w-3/4" /></div>
+        </template>
+        <ItemCard v-for="it in shelf" v-else :key="it.id" :item="it" />
+      </div>
+    </section>
+
+    <!-- 社团 + 活动航班表 -->
+    <section class="mt-16 grid gap-10 lg:grid-cols-[1fr_1.2fr]">
+      <div>
+        <div class="mb-5 flex items-end justify-between">
+          <h2 class="font-display text-3xl text-ocean">社团</h2>
+          <router-link :to="{ name: 'clubs' }" class="flex items-center gap-1 text-sm text-signal hover:underline">全部社团<ArrowRight class="size-4" /></router-link>
+        </div>
+        <div class="rounded-xl border border-dashed bg-white/60 p-6">
+          <p class="flex items-center gap-2 font-medium text-ocean">
+            <span class="inline-block size-0 border-y-[6px] border-l-[11px] border-y-transparent border-l-buoy" aria-hidden="true" />
+            社团目录正在建设
+          </p>
+          <p class="mt-2 text-sm leading-relaxed text-muted-foreground">
+            上线后可以浏览全校社团、在线申请入社。正在招新的社团会在名字前挂出一面橙色信号旗。
+          </p>
+        </div>
+      </div>
+
+      <div>
+        <div class="mb-5 flex items-end justify-between">
+          <h2 class="font-display text-3xl text-ocean">活动航班表</h2>
+          <router-link :to="{ name: 'activities' }" class="flex items-center gap-1 text-sm text-signal hover:underline">全部活动<ArrowRight class="size-4" /></router-link>
+        </div>
+        <table class="w-full text-left text-sm">
+          <thead class="border-y text-muted-foreground">
+            <tr><th class="w-20 py-2 font-normal">日期</th><th class="py-2 font-normal">活动</th><th class="w-20 py-2 text-right font-normal">名额</th></tr>
+          </thead>
+          <tbody>
+            <tr class="border-b">
+              <td colspan="3" class="py-8 text-center text-muted-foreground">首批社团活动即将发布，报名后会显示在这里</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
   </div>
 </template>
-
-<style scoped>
-.top {
-  background: var(--brand);
-  color: #fff;
-  padding: 18px var(--page-x) 6px;
-}
-.brand {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  padding: 0 4px;
-}
-.name {
-  font-size: 20px;
-  font-weight: 600;
-  letter-spacing: 1px;
-}
-.sub {
-  font-size: 12px;
-  opacity: 0.8;
-}
-.search {
-  padding: 10px 0 8px;
-  --van-search-content-background: #fff;
-}
-
-.sticky {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  background: var(--bg-card);
-  box-shadow: 0 1px 0 var(--border);
-}
-.filters {
-  --van-dropdown-menu-height: 40px;
-  --van-dropdown-menu-shadow: none;
-  --van-dropdown-menu-title-font-size: 13px;
-  border-top: 1px solid var(--border);
-}
-
-.result-hint {
-  margin: 12px var(--page-x) 0;
-  color: var(--text-2);
-  font-size: 12px;
-}
-.grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--gap);
-  padding: var(--gap) var(--page-x);
-}
-</style>

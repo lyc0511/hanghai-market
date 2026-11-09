@@ -20,6 +20,9 @@ function readToken() {
 export const useUserStore = defineStore('user', () => {
   const token = ref(readToken())
   const profile = ref(null)
+  // 右上角登录弹窗：任何页面都可以调用 openLogin() 打开
+  const loginVisible = ref(false)
+  const loginMode = ref('login')
 
   const isLoggedIn = computed(() => !!token.value)
   const isAdmin = computed(() => profile.value?.role === 'admin')
@@ -49,6 +52,11 @@ export const useUserStore = defineStore('user', () => {
     return profile.value
   }
 
+  function openLogin(mode = 'login') {
+    loginMode.value = mode
+    loginVisible.value = true
+  }
+
   function logout() {
     token.value = ''
     profile.value = null
@@ -59,5 +67,5 @@ export const useUserStore = defineStore('user', () => {
     }
   }
 
-  return { token, profile, isLoggedIn, isAdmin, login, register, fetchProfile, logout }
+  return { token, profile, isLoggedIn, isAdmin, loginVisible, loginMode, login, register, fetchProfile, openLogin, logout }
 })

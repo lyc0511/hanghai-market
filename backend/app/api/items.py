@@ -1,10 +1,18 @@
-"""二手物品：发布、列表搜索、我发布的、详情。
+"""二手物品：发布、列表搜索、我发布的、详情、编辑、下架、重新上架、删除。
 
 发布后状态为 pending（待审核），管理员审核通过后变为 online 才对其他人可见。
 
+卖家管理自己的物品：
+    编辑       pending / online / rejected / offline(未售出) ──▶ pending（内容变了必须重新审核）
+    下架       pending / online / rejected ──▶ offline
+    重新上架   offline(未售出) ──▶ pending
+    删除       任意状态 ──▶ deleted（软删除，数据保留，所有列表和详情都不再返回）
+已售出的物品不能编辑和重新上架。编辑、下架、删除时，进行中的交易意向自动关闭并通知买家。
+
 业务错误码：
     40401 物品不存在                42201 类目不存在或不是物品类目
-    42901 今日发布数量已达上限
+    42901 今日发布数量已达上限       40302 无权操作该物品
+    40905 物品当前状态不能执行此操作
 """
 from datetime import datetime, time
 from typing import Literal
@@ -20,7 +28,8 @@ from app.core.config import settings
 from app.core.constants import CampusArea
 from app.core.exceptions import BizError
 from app.db.session import get_db
-from app.models import Category, Content, Item, User
+from app.api.intents import notify
+from app.models import Category, Content, Item, TradeIntent, User
 from app.schemas.common import ApiResponse, Page, ok
 from app.schemas.item import CategoryBrief, ItemCardOut, ItemCondition, ItemCreateIn, ItemDetailOut, SellerBrief
 
@@ -74,6 +83,7 @@ def to_card(c: Content, show_reject_reason: bool = False) -> ItemCardOut:
         category_name=c.category.name if c.category else None,
         tags=c.tags,
         status=c.status,
+        sold=c.item.sold_at is not None,
         reject_reason=c.reject_reason if show_reject_reason else None,
         view_count=c.view_count,
         seller_nickname=c.owner.nickname,
@@ -238,3 +248,101 @@ def get_item(
         c.view_count += 1
 
     return ok(to_detail(c, viewer))
+
+
+# ---------------------------------------------------------------- 卖家管理自己的物品
+
+def lock_own_item(db: Session, item_id: int, user: User) -> Content:
+    """加行锁取出物品，并确认是本人的、未删除的物品。"""
+    c = db.scalar(select(Content).where(Content.id == item_id, Content.type == "item").with_for_update())
+    if c is None or c.status == "deleted":
+        raise BizError(40401, "物品不存在")
+    if c.owner_id != user.id:
+        raise BizError(40302, "无权操作该物品")
+    return c
+
+
+def close_active_intents(db: Session, c: Content, why: str) -> int:
+    """关闭该物品上进行中的意向（待处理 / 已接受），逐个通知买家，返回关闭数量。"""
+    intents = db.scalars(
+        select(TradeIntent).where(TradeIntent.item_id == c.id, TradeIntent.status.in_(("pending", "accepted")))
+    ).all()
+    for t in intents:
+        t.status = "rejected"
+        notify(db, t.buyer_id, "intent_closed", "交易意向已关闭", f"「{c.title}」{why}，你的意向已自动关闭。", "/me/intents")
+    return len(intents)
+
+
+def with_closed(msg: str, closed: int) -> str:
+    return msg + (f"，{closed} 个进行中的意向已关闭并通知买家" if closed else "")
+
+
+@router.put("/{item_id}", response_model=ApiResponse[ItemDetailOut], summary="编辑物品（提交后重新审核）")
+def update_item(
+    item_id: int,
+    body: ItemCreateIn,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ApiResponse[ItemDetailOut]:
+    c = lock_own_item(db, item_id, user)
+    item = db.get(Item, c.id)
+    if item.sold_at is not None:
+        raise BizError(40905, "物品已售出，不能再编辑")
+    category = db.get(Category, body.category_id)
+    if category is None or category.type != "item":
+        raise BizError(42201, "类目不存在或不是物品类目")
+
+    closed = close_active_intents(db, c, "的卖家修改了物品信息")
+    c.title = body.title
+    c.summary = body.summary or None
+    c.category_id = category.id
+    c.tags = body.tags
+    c.campus_area = body.campus_area or user.campus_area
+    c.search_text = build_search_text(body.title, body.summary, body.tags)
+    # 防止「先发正常内容过审、再改成违规内容」：任何修改都要重新审核
+    c.status = "pending"
+    c.reject_reason = None
+    item.price = body.price
+    item.original_price = body.original_price
+    item.condition = body.condition
+    item.images = body.images
+    db.commit()
+    db.expire_all()
+    return ok(to_detail(load_item(db, item_id), user), with_closed("已保存，等待管理员重新审核", closed))
+
+
+@router.post("/{item_id}/offline", response_model=ApiResponse[ItemDetailOut], summary="下架物品（卖家）")
+def take_offline(item_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> ApiResponse[ItemDetailOut]:
+    c = lock_own_item(db, item_id, user)
+    if c.status == "offline":
+        raise BizError(40905, "物品已经是下架状态")
+    closed = close_active_intents(db, c, "已被卖家下架")
+    c.status = "offline"
+    db.commit()
+    db.expire_all()
+    return ok(to_detail(load_item(db, item_id), user), with_closed("已下架", closed))
+
+
+@router.post("/{item_id}/relist", response_model=ApiResponse[ItemDetailOut], summary="重新上架（卖家，需重新审核）")
+def relist_item(item_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> ApiResponse[ItemDetailOut]:
+    c = lock_own_item(db, item_id, user)
+    if c.status != "offline":
+        raise BizError(40905, "只有已下架的物品可以重新上架")
+    if db.get(Item, c.id).sold_at is not None:
+        raise BizError(40905, "物品已售出，不能重新上架")
+    c.status = "pending"
+    c.reject_reason = None
+    db.commit()
+    db.expire_all()
+    return ok(to_detail(load_item(db, item_id), user), "已提交，等待管理员审核")
+
+
+@router.delete("/{item_id}", response_model=ApiResponse[None], summary="删除物品（软删除）")
+def delete_item(item_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> ApiResponse[None]:
+    c = lock_own_item(db, item_id, user)
+    closed = close_active_intents(db, c, "已被卖家删除")
+    # 软删除：只改状态，数据和交易记录保留，方便追溯纠纷
+    c.status = "deleted"
+    db.commit()
+    return ok(None, with_closed("已删除", closed))
+

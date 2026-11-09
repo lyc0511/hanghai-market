@@ -183,7 +183,7 @@ onMounted(() => {
 
 <style scoped>
 .panel {
-  border-radius: var(--radius);
+  border-radius: var(--r);
 }
 .thumb {
   width: 60px;

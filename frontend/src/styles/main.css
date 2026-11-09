@@ -1,0 +1,144 @@
+
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap');
+
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn-vue/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* 得意黑：只用于大标题等展示文字。font-display: swap 表示字体没加载完时先用系统字体显示，不会白屏 */
+@font-face {
+    font-family: "Smiley Sans";
+    src: url("/fonts/SmileySans-Oblique.woff2") format("woff2");
+    font-display: swap;
+}
+
+@theme inline {
+    --font-sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+    --font-display: "Smiley Sans", var(--font-sans);
+    --color-ocean: var(--ocean);
+    --color-signal: var(--signal);
+    --color-buoy: var(--buoy);
+    --color-sail: var(--sail);
+    --color-fog: var(--fog);
+    --color-kelp: var(--kelp);
+    --font-heading: var(--font-sans);
+    --color-sidebar-ring: var(--sidebar-ring);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar: var(--sidebar);
+    --color-chart-5: var(--chart-5);
+    --color-chart-4: var(--chart-4);
+    --color-chart-3: var(--chart-3);
+    --color-chart-2: var(--chart-2);
+    --color-chart-1: var(--chart-1);
+    --color-ring: var(--ring);
+    --color-input: var(--input);
+    --color-border: var(--border);
+    --color-destructive: var(--destructive);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-accent: var(--accent);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-muted: var(--muted);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-secondary: var(--secondary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-primary: var(--primary);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-popover: var(--popover);
+    --color-card-foreground: var(--card-foreground);
+    --color-card: var(--card);
+    --color-foreground: var(--foreground);
+    --color-background: var(--background);
+    --radius-sm: calc(var(--radius) * 0.6);
+    --radius-md: calc(var(--radius) * 0.8);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) * 1.4);
+    --radius-2xl: calc(var(--radius) * 1.8);
+    --radius-3xl: calc(var(--radius) * 2.2);
+    --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/*
+ * 设计规范：港口色板（6 个颜色）
+ *   深海蓝 ocean  #0E2A47  标题文字、到港公告牌底色
+ *   信号蓝 signal #1D5FD1  主按钮、链接
+ *   浮标橙 buoy   #F26B21  价格、招新信号旗、当前导航
+ *   帆布白 sail   #F5F7F6  页面背景
+ *   雾灰   fog    #D7DEE6  边框、分隔线
+ *   海藻绿 kelp   #2E8B6E  免费送、报名中等正面状态
+ * 下面的 --primary、--border 等是 shadcn 组件读取的语义变量，都映射到这 6 个颜色上。
+ */
+:root {
+    --ocean: #0E2A47;
+    --signal: #1D5FD1;
+    --buoy: #F26B21;
+    --sail: #F5F7F6;
+    --fog: #D7DEE6;
+    --kelp: #2E8B6E;
+
+    --background: var(--sail);
+    --foreground: var(--ocean);
+    --card: #ffffff;
+    --card-foreground: var(--ocean);
+    --popover: #ffffff;
+    --popover-foreground: var(--ocean);
+    --primary: var(--signal);
+    --primary-foreground: #ffffff;
+    --secondary: #E8EEF5;
+    --secondary-foreground: var(--ocean);
+    --muted: #EEF2F5;
+    --muted-foreground: #5B6B7D;
+    --accent: #E8EEF5;
+    --accent-foreground: var(--ocean);
+    --destructive: #D93F3F;
+    --border: var(--fog);
+    --input: #C9D3DE;
+    --ring: var(--signal);
+    --chart-1: var(--signal);
+    --chart-2: var(--buoy);
+    --chart-3: var(--kelp);
+    --chart-4: #8FA5BC;
+    --chart-5: var(--ocean);
+    --radius: 0.625rem;
+    --sidebar: #ffffff;
+    --sidebar-foreground: var(--ocean);
+    --sidebar-primary: var(--signal);
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #E8EEF5;
+    --sidebar-accent-foreground: var(--ocean);
+    --sidebar-border: var(--fog);
+    --sidebar-ring: var(--signal);
+}
+
+@layer base {
+    * {
+        @apply border-border outline-ring/50;
+    }
+    body {
+        @apply bg-background text-foreground font-sans antialiased;
+    }
+    /* 系统设置了「减少动态效果」时，关闭所有过渡和动画（无障碍要求） */
+    @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+            animation-duration: 0.01ms !important;
+            transition-duration: 0.01ms !important;
+        }
+    }
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    }
+  body {
+    @apply bg-background text-foreground;
+    }
+}
