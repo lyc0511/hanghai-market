@@ -16,6 +16,15 @@ export const metaApi = {
   categories: (type) => http.get('/meta/categories', { params: { type } }),
 }
 
+export const uploadApi = {
+  /** 上传一张图片，返回 {path, url}：path 用来提交给后端，url 用来预览 */
+  image(file) {
+    const form = new FormData()
+    form.append('file', file)
+    return http.post('/upload/image', form)
+  },
+}
+
 export const itemApi = {
   list: (params) => http.get('/items', { params }),
   detail: (id) => http.get(`/items/${id}`),
@@ -25,4 +34,15 @@ export const itemApi = {
 
 export const intentApi = {
   create: (itemId, message) => http.post('/intents', { item_id: itemId, message }),
+  mine: (params) => http.get('/intents/mine', { params }),
+  accept: (id) => http.post(`/intents/${id}/accept`),
+  reject: (id) => http.post(`/intents/${id}/reject`),
+  cancel: (id) => http.post(`/intents/${id}/cancel`),
+  complete: (id) => http.post(`/intents/${id}/complete`),
+}
+
+export const adminApi = {
+  items: (params) => http.get('/admin/items', { params }),
+  approveItem: (id) => http.post(`/admin/items/${id}/approve`),
+  rejectItem: (id, reason) => http.post(`/admin/items/${id}/reject`, { reason }),
 }

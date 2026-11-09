@@ -68,6 +68,16 @@ function onLogout() {
     </p>
 
     <van-cell-group inset class="group">
+      <van-cell title="我发布的" icon="goods-collect-o" is-link :to="{ name: 'my-items' }" />
+      <van-cell title="我想要的" icon="cart-o" is-link :to="{ name: 'my-intents', query: { role: 'buyer' } }" />
+      <van-cell title="找我买的" icon="balance-list-o" is-link :to="{ name: 'my-intents', query: { role: 'seller' } }" />
+    </van-cell-group>
+
+    <van-cell-group v-if="user.isAdmin" inset class="group">
+      <van-cell title="管理后台" label="建议在电脑上打开" icon="setting-o" is-link :to="{ name: 'admin-items' }" />
+    </van-cell-group>
+
+    <van-cell-group inset class="group">
       <van-cell title="退出登录" icon="revoke" is-link @click="onLogout" />
     </van-cell-group>
 

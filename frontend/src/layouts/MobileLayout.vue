@@ -17,6 +17,10 @@ const showTabbar = computed(() => route.meta.tab === true)
     </main>
     <van-tabbar v-if="showTabbar" route fixed placeholder safe-area-inset-bottom>
       <van-tabbar-item to="/" icon="shop-o">首页</van-tabbar-item>
+      <van-tabbar-item to="/publish" class="publish-tab">
+        <template #icon><span class="publish-btn"><van-icon name="plus" /></span></template>
+        发布
+      </van-tabbar-item>
       <van-tabbar-item to="/me" icon="user-o">我的</van-tabbar-item>
     </van-tabbar>
   </div>
@@ -39,6 +43,20 @@ const showTabbar = computed(() => route.meta.tab === true)
   :global(body) {
     background: #e9edf2;
   }
+}
+
+/* 中间的「发布」：突出的圆形按钮 */
+.publish-btn {
+  width: 40px;
+  height: 40px;
+  margin-top: -14px;
+  border-radius: 50%;
+  background: var(--brand);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+  box-shadow: 0 4px 12px rgba(29, 111, 216, 0.35);
 }
 
 /*
