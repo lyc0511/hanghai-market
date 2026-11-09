@@ -98,3 +98,8 @@ export const reportApi = {
   create: (data) => http.post('/reports', data),
   mine: (params) => http.get('/reports/mine', { params }),
 }
+
+export const assistantApi = {
+  /** 大模型可能要查好几次数据，给 60 秒超时（默认 15 秒不够） */
+  chat: (sessionId, messages) => http.post('/assistant/chat', { session_id: sessionId, messages }, { timeout: 60000 }),
+}

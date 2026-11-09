@@ -14,9 +14,13 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "./uploads"
     UPLOAD_BASE_URL: str = "http://127.0.0.1:8000/uploads"
     MAX_UPLOAD_MB: int = 5
-    LLM_API_BASE: str = ""
+    # AI 助手（T14）：DeepSeek，OpenAI 兼容格式。LLM_API_KEY 留空时助手自动降级为「关键词搜索 + 常用入口」
+    LLM_API_BASE: str = "https://api.deepseek.com"
     LLM_API_KEY: str = ""
-    LLM_MODEL: str = ""
+    LLM_MODEL: str = "deepseek-flash"
+    LLM_TIMEOUT_SECONDS: float = 30
+    ASSISTANT_PER_MINUTE: int = 6  # 每个用户（游客按 IP）每分钟最多提问次数
+    ASSISTANT_PER_DAY: int = 60  # 每天最多提问次数，防止额度被刷光
     EMBEDDING_API_BASE: str = ""
     EMBEDDING_API_KEY: str = ""
     EMBEDDING_MODEL: str = ""
