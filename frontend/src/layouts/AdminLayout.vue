@@ -1,6 +1,6 @@
 <!-- 管理后台外壳（电脑端）：左侧菜单 + 顶栏 + 内容区，使用 Element Plus -->
 <script setup>
-import { Goods, HomeFilled, SwitchButton } from '@element-plus/icons-vue'
+import { Calendar, Goods, HomeFilled, SwitchButton } from '@element-plus/icons-vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { useUserStore } from '@/stores/user'
@@ -29,6 +29,10 @@ function logout() {
         <el-menu-item index="admin-items" :route="{ name: 'admin-items' }">
           <el-icon><Goods /></el-icon>
           <span>物品审核</span>
+        </el-menu-item>
+        <el-menu-item index="admin-activities" :route="{ name: 'admin-activities' }">
+          <el-icon><Calendar /></el-icon>
+          <span>活动审核</span>
         </el-menu-item>
       </el-menu>
     </el-aside>

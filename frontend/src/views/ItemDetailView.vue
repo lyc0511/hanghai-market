@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
 import { confirm } from '@/composables/confirm'
+import { formatDate } from '@/lib/time'
 import { useMetaStore } from '@/stores/meta'
 import { useUserStore } from '@/stores/user'
 
@@ -188,7 +189,7 @@ async function ownerAct(name) {
             <span class="grid size-11 place-items-center rounded-full bg-ocean text-lg font-semibold text-white">{{ item.seller.nickname.slice(0, 1) }}</span>
             <div>
               <div class="font-medium">{{ item.seller.nickname }}</div>
-              <div class="text-sm text-muted-foreground">{{ item.seller.campus_area ?? '校内同学' }}，{{ new Date(item.created_at).toLocaleDateString() }} 发布</div>
+              <div class="text-sm text-muted-foreground">{{ item.seller.campus_area ?? '校内同学' }}，{{ formatDate(item.created_at) }} 发布</div>
             </div>
           </div>
 

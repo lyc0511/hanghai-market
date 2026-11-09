@@ -8,7 +8,8 @@ import { motion } from 'motion-v'
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
-import { clubApi, itemApi } from '@/api'
+import { activityApi, clubApi, itemApi } from '@/api'
+import ActivityTable from '@/components/ActivityTable.vue'
 import ItemCard from '@/components/ItemCard.vue'
 import SignalFlag from '@/components/SignalFlag.vue'
 import { Button } from '@/components/ui/button'
@@ -24,11 +25,16 @@ const keyword = ref('')
 const arrivals = ref([]) // 到港公告：最新上架的物品
 const shelf = ref([]) // 闲置货架
 const recruitingClubs = ref([])
+const upcoming = ref([]) // 活动航班表：即将开始的活动
 const clubsLoaded = ref(false)
 const loading = ref(true)
 
 onMounted(async () => {
   meta.load().catch(() => {})
+  activityApi
+    .list({ when: 'upcoming', page_size: 5 })
+    .then((data) => (upcoming.value = data.items))
+    .catch(() => {})
   const clubsTask = clubApi
     .list({ recruiting: true, page: 1, page_size: 20 })
     .then((data) => {
@@ -160,16 +166,7 @@ function flip(i) {
           <h2 class="font-display text-3xl text-ocean">活动航班表</h2>
           <router-link :to="{ name: 'activities' }" class="flex items-center gap-1 text-sm text-signal hover:underline">全部活动<ArrowRight class="size-4" /></router-link>
         </div>
-        <table class="w-full text-left text-sm">
-          <thead class="border-y text-muted-foreground">
-            <tr><th class="w-20 py-2 font-normal">日期</th><th class="py-2 font-normal">活动</th><th class="w-20 py-2 text-right font-normal">名额</th></tr>
-          </thead>
-          <tbody>
-            <tr class="border-b">
-              <td colspan="3" class="py-8 text-center text-muted-foreground">首批社团活动即将发布，报名后会显示在这里</td>
-            </tr>
-          </tbody>
-        </table>
+        <ActivityTable :items="upcoming" compact empty-text="最近没有即将开始的活动" />
       </div>
     </section>
   </div>

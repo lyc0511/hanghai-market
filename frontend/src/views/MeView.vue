@@ -1,6 +1,6 @@
 <!-- 个人中心：基本信息、微信号设置、常用入口 -->
 <script setup>
-import { ChevronRight, Loader2, LogOut, Package, Settings, ShieldCheck, ShoppingBag, Store, Users } from '@lucide/vue'
+import { CalendarDays, ChevronRight, Loader2, LogOut, Package, Settings, ShieldCheck, ShoppingBag, Store, Users } from '@lucide/vue'
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
@@ -23,6 +23,7 @@ const saving = ref(false)
 
 const LINKS = [
   { to: { name: 'my-clubs' }, icon: Users, label: '我的社团' },
+  { to: { name: 'my-activities' }, icon: CalendarDays, label: '我报名的活动' },
   { to: { name: 'my-items' }, icon: Package, label: '我发布的' },
   { to: { name: 'my-intents', query: { role: 'buyer' } }, icon: ShoppingBag, label: '我想要的' },
   { to: { name: 'my-intents', query: { role: 'seller' } }, icon: Store, label: '找我买的' },

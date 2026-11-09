@@ -63,4 +63,19 @@ export const adminApi = {
   items: (params) => http.get('/admin/items', { params }),
   approveItem: (id) => http.post(`/admin/items/${id}/approve`),
   rejectItem: (id, reason) => http.post(`/admin/items/${id}/reject`, { reason }),
+  activities: (params) => http.get('/admin/activities', { params }),
+  approveActivity: (id) => http.post(`/admin/activities/${id}/approve`),
+  rejectActivity: (id, reason) => http.post(`/admin/activities/${id}/reject`, { reason }),
 }
+
+export const activityApi = {
+  list: (params) => http.get('/activities', { params }),
+  mine: (params) => http.get('/activities/mine', { params }),
+  detail: (id) => http.get(`/activities/${id}`),
+  signup: (id) => http.post(`/activities/${id}/signup`),
+  cancel: (id) => http.delete(`/activities/${id}/signup`),
+  signups: (id, params) => http.get(`/activities/${id}/signups`, { params }),
+  ofClub: (clubId, params) => http.get(`/clubs/${clubId}/activities`, { params }),
+  create: (clubId, body) => http.post(`/clubs/${clubId}/activities`, body),
+}
+

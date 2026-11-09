@@ -5,6 +5,7 @@ import 'element-plus/es/components/message-box/style/css'
 import { onMounted, reactive, ref } from 'vue'
 
 import { adminApi } from '@/api'
+import { formatDateTime } from '@/lib/time'
 import { useMetaStore } from '@/stores/meta'
 
 const meta = useMetaStore()
@@ -131,7 +132,7 @@ onMounted(() => {
         </template>
       </el-table-column>
       <el-table-column label="提交时间" width="170">
-        <template #default="{ row }">{{ new Date(row.created_at).toLocaleString() }}</template>
+        <template #default="{ row }">{{ formatDateTime(row.created_at) }}</template>
       </el-table-column>
       <el-table-column :label="query.status === 'pending' ? '操作' : '备注'" width="180" fixed="right">
         <template #default="{ row }">

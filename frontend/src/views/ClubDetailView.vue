@@ -6,6 +6,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 
 import { clubApi } from '@/api'
+import ClubActivities from '@/components/ClubActivities.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import SignalFlag from '@/components/SignalFlag.vue'
 import { Badge } from '@/components/ui/badge'
@@ -237,6 +238,8 @@ watch(
           <p v-else class="mt-2 text-sm text-muted-foreground">当前没有开放招新</p>
           <p v-if="club.recruit_note" class="mt-3 leading-relaxed text-ocean">{{ club.recruit_note }}</p>
         </section>
+
+        <ClubActivities :club-id="club.id" :is-president="club.my_status === 'president'" />
 
         <section class="mt-8">
           <div class="mb-3 flex items-baseline justify-between">

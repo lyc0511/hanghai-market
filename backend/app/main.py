@@ -3,7 +3,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from app.api import admin, auth, clubs, intents, items, meta, upload
+from app.api import activities, admin, auth, clubs, intents, items, meta, upload
 from app.core.config import settings
 from app.core.exceptions import register_exception_handlers
 
@@ -25,6 +25,8 @@ app.include_router(items.router, prefix="/api")
 app.include_router(intents.router, prefix="/api")
 app.include_router(clubs.router, prefix="/api")
 app.include_router(clubs.application_router, prefix="/api")
+app.include_router(activities.router, prefix="/api")
+app.include_router(activities.club_router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
 
 
