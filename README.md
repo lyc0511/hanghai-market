@@ -9,6 +9,7 @@
 - **T04 物品审核**（管理员审核列表、通过上架、驳回并附原因；通知卖家、记录管理日志）
 - **T05 物品列表与搜索**（关键词搜索、分类 / 校区 / 成色 / 价格筛选、四种排序、分页；我发布的物品）
 - **T06 个人资料与交易意向**（微信号 AES-GCM 加密存储；发起 / 接受 / 拒绝 / 取消 / 成交，接受后双方互看微信号）
+- **F01 前端框架**（海蓝色设计规范、请求封装、登录状态、手机端布局；登录注册、首页列表搜索、物品详情、发起意向、个人中心）
 
 ## 技术栈
 
@@ -17,7 +18,8 @@
 | 后端 | Python 3.14 · FastAPI 0.162 · SQLAlchemy 2.1（同步 Session）· psycopg 3 |
 | 数据库 | PostgreSQL 17（不使用 pgvector，向量以 JSON 文本存放在 `contents.embedding_text`） |
 | 安全 | bcrypt 5（直接调用，不用 passlib）· PyJWT |
-| 包管理 | uv |
+| 包管理 | uv（后端）· npm（前端） |
+| 前端 | Vue 3 · Vite · Vue Router · Pinia · Axios · Vant 4（手机端）· Element Plus（管理后台） |
 
 ## 目录结构
 
@@ -107,6 +109,16 @@ uv pip install -r requirements.txt --python .venv\Scripts\python.exe
 ```
 
 打开 http://127.0.0.1:8000/docs 查看接口文档。
+
+### 7. 启动前端（另开一个终端，后端需保持运行）
+
+```powershell
+cd C:\dev\campus-platform\frontend
+npm install      # 只需第一次
+npm run dev
+```
+
+打开 http://localhost:5173 。开发服务器会把 `/api` 和 `/uploads` 请求转发给后端的 8000 端口。
 
 ## 演示账号（密码均为 `Test1234`）
 
@@ -269,3 +281,17 @@ pending ──卖家接受──▶ accepted ──卖家标记成交──▶ c
 微信号用 **AES-256-GCM** 加密后存入 `users.wechat_id_enc`（格式 `v1:<base64>`），只在本人查看资料或交易意向被接受时解密。与密码的区别：密码用 bcrypt 哈希（不可逆，只需比对），微信号需要展示给对方，所以用可解密的对称加密。
 
 旧数据中的明文微信号可用 `scripts/encrypt_wechat.py` 一次性加密（可重复执行）。
+
+## 前端结构
+
+```
+frontend/src/
+├── styles/theme.css     # 设计规范：颜色、圆角、间距只在这里定义，页面用 var(--xxx)
+├── api/http.js          # 请求封装：自动带令牌、统一处理 code、401 跳登录
+├── api/index.js         # 接口清单：一个函数对应一个后端接口
+├── stores/              # Pinia：user（登录状态）、meta（字典数据）
+├── router/index.js      # 路由与登录守卫（meta.auth）
+├── layouts/             # MobileLayout：手机端外壳 + 底部标签栏
+├── components/          # ItemCard 等可复用组件
+└── views/               # 页面
+```

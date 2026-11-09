@@ -1,0 +1,100 @@
+/*
+ * 设计规范（Design Tokens）：全站的颜色、圆角、间距、字号只在这里定义。
+ * 页面里一律用 var(--xxx)，不直接写色值，这样改主题只需改这一个文件。
+ */
+:root {
+  /* 品牌色：海蓝，呼应「航海」 */
+  --brand: #1d6fd8;
+  --brand-dark: #0f4c9c;
+  --brand-soft: #e8f1fd;
+  /* 强调色：价格、促销等需要吸引注意的地方 */
+  --accent: #f2672e;
+  --accent-soft: #fff1ea;
+  /* 状态色 */
+  --success: #16a36a;
+  --warning: #e8a317;
+  --danger: #e5484d;
+
+  /* 文字 */
+  --text-1: #17202b; /* 标题、正文 */
+  --text-2: #5b6573; /* 次要信息 */
+  --text-3: #98a1ad; /* 提示、占位 */
+
+  /* 背景与边框 */
+  --bg-page: #f3f5f8;
+  --bg-card: #ffffff;
+  --border: #e6e9ee;
+
+  /* 圆角、间距、阴影 */
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 16px;
+  --gap: 12px;
+  --page-x: 14px; /* 页面左右留白 */
+  --shadow-card: 0 1px 2px rgba(23, 32, 43, 0.04), 0 4px 14px rgba(23, 32, 43, 0.05);
+
+  /* 字体：优先系统中文字体 */
+  --font: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
+
+  /* 把品牌色同步给 Vant 和 Element Plus，组件库自动跟随主题 */
+  --van-primary-color: var(--brand);
+  --van-danger-color: var(--danger);
+  --van-success-color: var(--success);
+  --van-warning-color: var(--warning);
+  --van-text-color: var(--text-1);
+  --van-background: var(--bg-page);
+  --van-border-color: var(--border);
+  --van-radius-md: var(--radius-sm);
+  --van-tabbar-item-active-color: var(--brand);
+  --el-color-primary: var(--brand);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg-page);
+  color: var(--text-1);
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* 价格：统一的样式 */
+.price {
+  color: var(--accent);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.price::before {
+  content: '¥';
+  font-size: 0.75em;
+  margin-right: 1px;
+}
+
+/* 多行文字截断 */
+.line-1,
+.line-2 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+}
+.line-1 {
+  -webkit-line-clamp: 1;
+}
+.line-2 {
+  -webkit-line-clamp: 2;
+}
