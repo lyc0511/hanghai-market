@@ -3,8 +3,8 @@
   手机宽度下，导航和搜索收进左侧抽屉菜单。
 -->
 <script setup>
-import { ChevronDown, LogOut, Menu, Package, Plus, Search, Settings, ShoppingBag, User, Users } from '@lucide/vue'
-import { ref } from 'vue'
+import { Bell, ChevronDown, LogOut, Menu, Package, Plus, Search, Settings, ShoppingBag, User, Users } from '@lucide/vue'
+import { ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import LoginForm from '@/components/LoginForm.vue'
@@ -20,11 +20,24 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
+import { useNotificationStore } from '@/stores/notifications'
 import { useUserStore } from '@/stores/user'
 
 const route = useRoute()
 const router = useRouter()
 const user = useUserStore()
+const notices = useNotificationStore()
+
+// 登录后开始轮询未读数，退出后停止；换页时顺手刷新一次
+watch(
+  () => user.isLoggedIn,
+  (v) => (v ? notices.start() : notices.stop()),
+  { immediate: true },
+)
+watch(
+  () => route.fullPath,
+  () => user.isLoggedIn && notices.refresh(),
+)
 
 const NAV = [
   { to: '/', label: '首页', exact: true },
@@ -93,6 +106,21 @@ function logout() {
       <div class="ml-auto flex items-center gap-2 lg:ml-0">
         <Button class="hidden md:inline-flex" @click="onPublish"><Plus />发布闲置</Button>
 
+        <router-link
+          v-if="user.isLoggedIn"
+          to="/notifications"
+          class="relative grid size-9 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-ocean"
+          :aria-label="notices.unread ? `通知，${notices.unread} 条未读` : '通知'"
+        >
+          <Bell class="size-5" />
+          <span
+            v-if="notices.unread"
+            class="absolute -right-0.5 -top-0.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-buoy px-1 text-[11px] font-semibold leading-none text-white ring-2 ring-white"
+          >
+            {{ notices.unread > 99 ? '99+' : notices.unread }}
+          </span>
+        </router-link>
+
         <DropdownMenu v-if="user.isLoggedIn">
           <DropdownMenuTrigger as-child>
             <button type="button" class="flex items-center gap-2 rounded-full py-1 pl-1 pr-2 transition-colors hover:bg-muted">
@@ -113,6 +141,7 @@ function logout() {
             <DropdownMenuItem @select="go('my-items')"><Package />我发布的</DropdownMenuItem>
             <DropdownMenuItem @select="go('my-clubs')"><Users />我的社团</DropdownMenuItem>
             <DropdownMenuItem @select="go('my-intents')"><ShoppingBag />我的意向</DropdownMenuItem>
+            <DropdownMenuItem @select="go('notifications')"><Bell />消息通知</DropdownMenuItem>
             <template v-if="user.isAdmin">
               <DropdownMenuSeparator />
               <DropdownMenuItem @select="go('admin-items')"><Settings />管理后台</DropdownMenuItem>

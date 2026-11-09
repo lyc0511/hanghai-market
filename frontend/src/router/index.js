@@ -25,6 +25,7 @@ const routes = [
       { path: 'me/activities', name: 'my-activities', component: () => import('@/views/MyActivitiesView.vue'), meta: { title: '我报名的活动', auth: true } },
       { path: 'me/clubs', name: 'my-clubs', component: () => import('@/views/MyClubsView.vue'), meta: { title: '我的社团', auth: true } },
       { path: 'me/items', name: 'my-items', component: () => import('@/views/MyItemsView.vue'), meta: { title: '我发布的', auth: true } },
+      { path: 'notifications', name: 'notifications', component: () => import('@/views/NotificationsView.vue'), meta: { title: '消息通知', auth: true } },
       { path: 'me/intents', name: 'my-intents', component: () => import('@/views/MyIntentsView.vue'), meta: { title: '我的意向', auth: true } },
       { path: 'items/:id/edit', name: 'item-edit', component: () => import('@/views/PublishView.vue'), meta: { title: '编辑物品', auth: true } },
       { path: 'items/:id', name: 'item', component: () => import('@/views/ItemDetailView.vue'), meta: { title: '物品详情' } },

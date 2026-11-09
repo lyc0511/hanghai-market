@@ -24,7 +24,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 from app.api.deps import get_current_user, get_optional_user
-from app.api.intents import notify
+from app.api.notifications import notify
 from app.api.meta import ENUMS
 from app.api.upload import public_url
 from app.core.constants import CampusArea

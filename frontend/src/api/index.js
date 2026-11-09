@@ -79,3 +79,10 @@ export const activityApi = {
   create: (clubId, body) => http.post(`/clubs/${clubId}/activities`, body),
 }
 
+
+export const notificationApi = {
+  list: (params) => http.get('/notifications', { params }),
+  unreadCount: () => http.get('/notifications/unread-count'),
+  read: (id) => http.post(`/notifications/${id}/read`),
+  readAll: () => http.post('/notifications/read-all'),
+}

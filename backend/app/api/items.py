@@ -28,7 +28,7 @@ from app.core.config import settings
 from app.core.constants import CampusArea
 from app.core.exceptions import BizError
 from app.db.session import get_db
-from app.api.intents import notify
+from app.api.notifications import notify
 from app.models import Category, Content, Item, TradeIntent, User
 from app.schemas.common import ApiResponse, Page, ok
 from app.schemas.item import CategoryBrief, ItemCardOut, ItemCondition, ItemCreateIn, ItemDetailOut, SellerBrief

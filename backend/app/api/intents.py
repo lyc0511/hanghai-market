@@ -21,11 +21,12 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 from app.api.deps import get_current_user
+from app.api.notifications import notify
 from app.api.upload import public_url
 from app.core.crypto import decrypt_text
 from app.core.exceptions import BizError
 from app.db.session import get_db
-from app.models import Content, Item, Notification, TradeIntent, User
+from app.models import Content, Item, TradeIntent, User
 from app.schemas.common import ApiResponse, Page, ok
 from app.schemas.intent import IntentCreateIn, IntentItemBrief, IntentOut, UserBrief
 
@@ -33,10 +34,6 @@ router = APIRouter(prefix="/intents", tags=["交易意向"])
 
 STATUS_LABELS = {"pending": "待处理", "accepted": "已接受", "rejected": "已拒绝", "completed": "已成交", "cancelled": "已取消"}
 ACTIVE = ("pending", "accepted")
-
-
-def notify(db: Session, user_id: int, ntype: str, title: str, body: str, link: str) -> None:
-    db.add(Notification(user_id=user_id, type=ntype, title=title, body=body, link=link))
 
 
 def to_out(t: TradeIntent, viewer: User) -> IntentOut:
