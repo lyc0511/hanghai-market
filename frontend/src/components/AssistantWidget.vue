@@ -5,11 +5,12 @@
   - 搜到的物品 / 社团 / 活动以卡片显示在回复下方，点击跳转。
 -->
 <script setup>
-import { ArrowUp, Loader2, RotateCcw, Sparkles, X } from '@lucide/vue'
+import { ArrowUp, FilePenLine, Loader2, RotateCcw, Sparkles, X } from '@lucide/vue'
 import { nextTick, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import { assistantApi } from '@/api'
+import { saveDraft } from '@/lib/assistantDraft'
 
 const STORE_KEY = 'hhjs-assistant'
 const SUGGESTIONS = ['有没有 50 元以内的台灯', '最近有什么活动可以报名', '哪些社团在招新', '怎么发布闲置']
@@ -17,6 +18,7 @@ const TYPE_NAMES = { item: '闲置', club: '社团', activity: '活动' }
 const LINK_RE = /\[([^\]\n]+)\]\((\/(?!\/)[^)\s]*)\)/g
 
 const route = useRoute()
+const router = useRouter()
 
 const open = ref(false)
 const input = ref('')
@@ -107,7 +109,7 @@ async function send(text = input.value) {
   // 后端要求第一条之后可以任意，但最后一条必须是用户提问（上面刚 push 的就是）
   try {
     const res = await assistantApi.chat(sessionId.value, history)
-    messages.value.push({ role: 'assistant', content: res.reply, cards: res.cards, fallback: res.fallback })
+    messages.value.push({ role: 'assistant', content: res.reply, cards: res.cards, fallback: res.fallback, draft: res.draft })
   } catch (e) {
     messages.value.push({
       role: 'assistant',
@@ -127,6 +129,12 @@ function onKeydown(e) {
     e.preventDefault()
     send()
   }
+}
+
+/** 草稿带到发布页：draft 参数用时间戳，保证已在发布页时也能触发预填 */
+function openDraft(draft) {
+  saveDraft(draft)
+  router.push({ name: 'publish', query: { draft: Date.now() } })
 }
 
 function reset() {
@@ -216,6 +224,23 @@ function reset() {
               :class="m.error ? 'border-destructive/30 text-destructive' : 'text-ocean'"
             ><template v-for="(s, j) in segments(m.content)" :key="j"><router-link v-if="s.to" :to="s.to" class="font-medium text-signal underline-offset-2 hover:underline">{{ s.text }}</router-link><template v-else>{{ s.text }}</template></template></p>
             <p v-if="m.fallback && m.cards?.length" class="px-1 text-xs text-muted-foreground">AI 暂时不可用，以上是关键词搜索的结果</p>
+
+            <!-- 发布草稿：只是预填，真正发布要去发布页上传照片并提交 -->
+            <div v-if="m.draft" class="rounded-xl border border-signal/30 bg-white p-3 text-sm">
+              <p class="flex items-center gap-1.5 text-xs font-medium text-signal"><FilePenLine class="size-3.5" />发布草稿（未发布）</p>
+              <p class="mt-1.5 font-medium text-ocean">{{ m.draft.title }}</p>
+              <p class="mt-0.5 text-xs text-muted-foreground">
+                {{ m.draft.price === 0 ? '免费送' : `¥${m.draft.price}` }} · {{ m.draft.category_name }} · {{ m.draft.condition_name }}{{ m.draft.campus_area ? ` · ${m.draft.campus_area}` : '' }}
+              </p>
+              <p v-if="m.draft.summary" class="mt-1.5 line-clamp-3 text-xs text-ocean/80">{{ m.draft.summary }}</p>
+              <button
+                type="button"
+                class="mt-2.5 w-full rounded-lg bg-signal py-2 text-sm font-medium text-white transition hover:brightness-110"
+                @click="openDraft(m.draft)"
+              >
+                去发布页确认（还需上传照片）
+              </button>
+            </div>
 
             <!-- 结果卡片 -->
             <ul v-if="m.cards?.length" class="space-y-1.5">

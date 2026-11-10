@@ -165,3 +165,134 @@ def test_validation_and_rate_limit(client, make_user, monkeypatch):
     assert ask(client, "2", h)["code"] == 0
     assert ask(client, "3", h)["code"] == 42981
     assert ask(client, "游客不受该用户限制")["code"] == 0  # 游客按 IP 单独计数
+
+
+# ------------------------------------------------------------ 登录用户专属：查自己的信息
+
+def tools_sent(seen):
+    return {t["function"]["name"] for t in seen[0]["tools"]}
+
+
+def tool_message(seen, i=1):
+    """第 i 次请求时模型收到的最后一条工具结果（解析成 dict）。"""
+    return json.loads(seen[i]["messages"][-1]["content"])
+
+
+def test_personal_tools_only_for_logged_in(client, monkeypatch, make_user):
+    seen = fake_llm(monkeypatch, [{"content": "请先登录"}])
+    ask(client, "我发布的东西审核了吗")
+    assert not any(n.startswith("my_") for n in tools_sent(seen)) and "prepare_item_draft" not in tools_sent(seen)
+
+    # 游客即使让模型「硬调」个人工具，后端也不执行
+    seen = fake_llm(monkeypatch, [tool_call("my_items", {}), {"content": "好"}])
+    ask(client, "我发布的")
+    assert "error" in tool_message(seen)
+
+    _, h = make_user("登录用户")
+    seen = fake_llm(monkeypatch, [{"content": "好"}])
+    ask(client, "你好", h)
+    assert {"my_items", "my_intents", "my_activities", "my_clubs", "my_notifications", "prepare_item_draft"} <= tools_sent(seen)
+
+
+def test_my_items_only_returns_own(client, db, make_user, item_category_id, monkeypatch):
+    me, hm = make_user("我")
+    _, ho = make_user("别人")
+    mine = publish_item(client, hm, item_category_id, title="我的台灯")["data"]["id"]
+    other = publish_item(client, ho, item_category_id, title="别人的台灯")["data"]["id"]
+    db.get(Content, mine).status = "rejected"
+    db.get(Content, mine).reject_reason = "图片不清晰"
+    db.flush()
+
+    # 模型就算在参数里塞 user_id，也会被忽略：用户只从登录令牌来
+    seen = fake_llm(monkeypatch, [tool_call("my_items", {"user_id": 1, "owner_id": 1}), {"content": "好"}])
+    r = ask(client, "我的东西为什么没上架", hm)
+    result = tool_message(seen)
+    ids = [x["id"] for x in result["results"]]
+    assert mine in ids and other not in ids
+    assert result["results"][0]["status"] == "被驳回" and result["results"][0]["reject_reason"] == "图片不清晰"
+    assert [c["id"] for c in r["data"]["cards"]] == [mine]
+
+
+def test_my_intents_hide_wechat(client, db, make_user, item_category_id, monkeypatch):
+    seller, hs, item_id = online_item(client, db, make_user, item_category_id)
+    _, hb = make_user("买家", wechat="secret_wx_123")
+    iid = call(client, "POST", "/intents", hb, json={"item_id": item_id})["data"]["id"]
+    assert call(client, "POST", f"/intents/{iid}/accept", hs)["code"] == 0  # 已接受：网页上卖家能看到买家微信
+
+    seen = fake_llm(monkeypatch, [tool_call("my_intents", {"role": "seller"}), {"content": "好"}])
+    ask(client, "谁想买我的东西", hs)
+    raw = seen[1]["messages"][-1]["content"]
+    assert "secret_wx_123" not in raw  # 但不交给大模型
+    assert json.loads(raw)["results"][0]["status"] == "已接受"
+
+
+def test_other_personal_tools_run(client, make_user, monkeypatch):
+    _, h = make_user("新同学")
+    seen = fake_llm(monkeypatch, [
+        {"content": "", "tool_calls": [
+            {"id": "a", "function": {"name": "my_activities", "arguments": "{}"}},
+            {"id": "b", "function": {"name": "my_clubs", "arguments": "{}"}},
+            {"id": "c", "function": {"name": "my_notifications", "arguments": json.dumps({"unread_only": True})}},
+        ]},
+        {"content": "你还没有报名活动"},
+    ])
+    r = ask(client, "看看我的情况", h)
+    assert r["code"] == 0
+    results = [json.loads(m["content"]) for m in seen[1]["messages"] if m["role"] == "tool"]
+    assert results[0]["total"] == 0 and results[1]["joined"] == [] and results[2]["total"] == 0
+
+
+# ------------------------------------------------------------ 对话生成发布草稿
+
+DRAFT = {"title": "护眼台灯", "price": 30, "condition": "good", "summary": "用了一学期，三档调光", "tags": ["台灯", "宿舍"]}
+
+
+def category_name(db, cid):
+    from app.models import Category
+    return db.get(Category, cid).name
+
+
+def test_draft_is_validated_and_not_saved(client, db, make_user, item_category_id, monkeypatch):
+    from sqlalchemy import func
+    _, h = make_user("卖家")
+    before = db.scalar(select(func.count()).select_from(Content))
+    fake_llm(monkeypatch, [
+        tool_call("prepare_item_draft", {**DRAFT, "category": category_name(db, item_category_id)}),
+        {"content": "草稿好了，点下方去发布页确认"},
+    ])
+    r = ask(client, "帮我卖台灯，30 块，轻微使用痕迹", h)
+    d = r["data"]["draft"]
+    assert d["title"] == "护眼台灯" and d["category_id"] == item_category_id and d["price"] == 30
+    assert d["condition_name"] == "轻微使用痕迹" and d["campus_area"] == "黄埔校区"  # 没说校区就用个人资料里的
+    assert db.scalar(select(func.count()).select_from(Content)) == before  # 只生成草稿，不写数据库
+    assert last_log(db).intent == "draft"
+
+
+def test_draft_errors_go_back_to_model(client, db, make_user, item_category_id, monkeypatch):
+    _, h = make_user("卖家")
+    cat = category_name(db, item_category_id)
+    seen = fake_llm(monkeypatch, [
+        tool_call("prepare_item_draft", {**DRAFT, "category": cat, "title": "灯"}),
+        tool_call("prepare_item_draft", {**DRAFT, "category": cat, "original_price": 10}, "call_2"),
+        tool_call("prepare_item_draft", {**DRAFT, "category": "不存在的类目"}, "call_3"),
+        {"content": "标题太短了，能再具体点吗？"},
+    ])
+    r = ask(client, "卖灯", h)
+    results = [tool_message(seen, i) for i in (1, 2, 3)]
+    assert all(x["ok"] is False for x in results)
+    assert "标题" in results[0]["errors"][0]  # 与发布接口同一套规则
+    assert "原价" in results[1]["errors"][0]
+    assert "类目" in results[2]["errors"][0]
+    assert r["data"]["draft"] is None
+
+
+def test_draft_respects_daily_limit(client, db, make_user, item_category_id, monkeypatch):
+    _, h = make_user("卖家")
+    monkeypatch.setattr(assistant.settings, "DAILY_PUBLISH_LIMIT", 1)
+    publish_item(client, h, item_category_id)
+    seen = fake_llm(monkeypatch, [
+        tool_call("prepare_item_draft", {**DRAFT, "category": category_name(db, item_category_id)}),
+        {"content": "今天发不了了"},
+    ])
+    r = ask(client, "再卖一个", h)
+    assert tool_message(seen)["ok"] is False and r["data"]["draft"] is None

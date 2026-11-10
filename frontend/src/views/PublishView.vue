@@ -1,6 +1,9 @@
-<!-- 发布 / 编辑物品：网址里有 id 就是编辑模式（/items/:id/edit），会先把原内容填进表单 -->
+<!--
+  发布 / 编辑物品：网址里有 id 就是编辑模式（/items/:id/edit），会先把原内容填进表单。
+  从 AI 助手的草稿卡片过来时（?draft=时间戳），用助手整理好的内容预填，照片仍需用户自己上传。
+-->
 <script setup>
-import { ImagePlus, Loader2, X } from '@lucide/vue'
+import { ImagePlus, Loader2, Sparkles, X } from '@lucide/vue'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
@@ -13,6 +16,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
+import { takeDraft } from '@/lib/assistantDraft'
 import { useMetaStore } from '@/stores/meta'
 import { useUserStore } from '@/stores/user'
 
@@ -81,10 +85,33 @@ async function loadForEdit() {
   }
 }
 
+// AI 助手的草稿：只在「发布」模式下使用；字段已经由后端按发布规则校验过
+const fromAssistant = ref(false)
+function applyDraft() {
+  if (isEdit.value) return
+  const d = takeDraft()
+  if (!d) return
+  Object.assign(form, {
+    title: d.title ?? '',
+    summary: d.summary ?? '',
+    categoryId: d.category_id ? String(d.category_id) : '',
+    price: d.price == null ? '' : String(d.price),
+    originalPrice: d.original_price == null ? '' : String(d.original_price),
+    condition: d.condition || 'good',
+    campus: d.campus_area ?? form.campus,
+    tags: (d.tags ?? []).join(' '),
+  })
+  fromAssistant.value = true
+  toast.success('已填入小航整理的内容', { description: '上传照片、检查无误后再提交' })
+}
+
 onMounted(() => {
   meta.load().catch(() => {})
   if (isEdit.value) loadForEdit()
+  else applyDraft()
 })
+// 已经在发布页时再点草稿卡片，页面不会重新加载，靠网址里的 draft 参数变化来触发
+watch(() => route.query.draft, (v) => v && applyDraft())
 
 // 第一步：选好图片后立即上传，拿到 path
 async function onPick(e) {
@@ -164,6 +191,11 @@ async function onSubmit() {
 <template>
   <div class="container narrow">
     <PageHeader :title="isEdit ? '编辑物品' : '发布闲置'" />
+
+    <p v-if="fromAssistant && !isEdit" class="mb-6 flex items-start gap-2 rounded-lg border border-signal/20 bg-signal/5 px-3.5 py-2.5 text-sm text-ocean">
+      <Sparkles class="mt-0.5 size-4 shrink-0 text-signal" />
+      <span>下面的内容由小航根据你的描述整理，请<strong class="font-medium">上传照片</strong>并核对价格、成色后再提交。提交后需要管理员审核。</span>
+    </p>
 
     <div v-if="loadingItem" class="space-y-4"><Skeleton class="h-10" /><Skeleton class="h-32" /><Skeleton class="h-24" /></div>
 

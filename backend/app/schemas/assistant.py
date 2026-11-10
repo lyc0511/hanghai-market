@@ -36,8 +36,24 @@ class AssistantCard(BaseModel):
     cover: str | None = None
 
 
+class ItemDraft(BaseModel):
+    """助手整理好的发布草稿：已按发布接口的规则校验过，前端带到发布页预填，用户上传照片后自己提交。"""
+
+    title: str
+    summary: str
+    category_id: int
+    category_name: str
+    price: float
+    original_price: float | None
+    condition: str
+    condition_name: str
+    tags: list[str]
+    campus_area: str | None
+
+
 class ChatOut(BaseModel):
     reply: str
     cards: list[AssistantCard]
+    draft: ItemDraft | None = None
     # true 表示大模型不可用，本次是关键词搜索兜底的结果
     fallback: bool
