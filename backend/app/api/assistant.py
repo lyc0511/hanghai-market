@@ -34,7 +34,7 @@ from typing import Any, Callable, get_args
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Request
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api import activities as activity_api
@@ -351,6 +351,21 @@ def fallback_answer(db: Session, question: str) -> tuple[str, list[AssistantCard
 
 # ---------------------------------------------------------------- 接口
 
+def global_quota_exhausted(db: Session) -> bool:
+    """全站今天（北京时间）真正调用过大模型的提问次数是否已达上限。
+
+    用数据库里的对话记录计数（降级的不算，它不花钱），后端重启或开多个进程时计数都准确。
+    """
+    limit = settings.ASSISTANT_GLOBAL_PER_DAY
+    if limit <= 0:
+        return False
+    today_start = datetime.combine(datetime.now(LOCAL_TZ).date(), datetime.min.time(), tzinfo=LOCAL_TZ)
+    used = db.scalar(
+        select(func.count()).select_from(AiMessage).where(AiMessage.created_at >= today_start, AiMessage.fallback.is_(False))
+    )
+    return (used or 0) >= limit
+
+
 def client_key(request: Request, user: User | None) -> str:
     if user is not None:
         return f"user:{user.id}"
@@ -384,6 +399,9 @@ def chat(
     calls: list[dict[str, Any]] = []
     fallback = False
     try:
+        if global_quota_exhausted(db):
+            # 全站今日额度用完：不再请求大模型，直接走下面的降级流程
+            raise llm.LlmError(f"全站今日大模型调用已达上限 {settings.ASSISTANT_GLOBAL_PER_DAY} 次")
         reply = None
         specs = tool_specs(category_names)
         if user is not None:  # 查自己、生成草稿的工具只给登录用户

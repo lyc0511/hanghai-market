@@ -8,6 +8,7 @@
 - 所有时间相对“现在”计算，任何时候运行数据都是新鲜的；
 - 计数字段（member_count / enrolled_count）与明细表严格一致。
 """
+import os
 import random
 import sys
 from datetime import datetime, timedelta, timezone
@@ -40,7 +41,8 @@ from app.models import (  # noqa: E402
     User,
 )
 
-PASSWORD = "Test1234"
+# 本地默认 Test1234；服务器上通过环境变量 SEED_PASSWORD 换成不公开的密码
+PASSWORD = os.environ.get("SEED_PASSWORD") or "Test1234"
 ALL_TABLES = [
     "audit_logs", "ai_messages", "reports", "notifications", "activity_signups",
     "club_applications", "club_members", "trade_intents", "activities", "clubs",
@@ -566,7 +568,7 @@ def main() -> None:
         print(f"  AI 对话      {count(AiMessage)}")
         print(f"  管理日志     {count(AuditLog)}")
         print(f"  内容总数     {count(Content)}（物品 + 社团 + 活动）")
-        print(f"所有账号密码均为 {PASSWORD}")
+        print("所有账号密码均为 Test1234" if PASSWORD == "Test1234" else "所有账号密码为环境变量 SEED_PASSWORD 的值")
     except Exception:
         db.rollback()
         raise

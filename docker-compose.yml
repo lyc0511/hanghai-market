@@ -1,0 +1,71 @@
+# 航海集市 Docker 部署（服务器上使用；本地开发仍然用 python run.py + npm run dev）
+#
+# 三个容器：
+#   db        PostgreSQL 17 数据库（官方镜像，不对外开放）
+#   backend   FastAPI 后端（backend/Dockerfile，不对外开放，只有 Nginx 能访问）
+#   frontend  Nginx + 打包好的前端页面（frontend/Dockerfile，唯一对外开放 80 端口）
+#
+# 两个数据卷（容器删了重建，数据还在）：
+#   db-data   数据库文件
+#   uploads   用户上传的图片
+#
+# 密钥和密码都在同目录的 .env 里（模板见 .env.production.example，.env 不提交到 Git）
+#
+# 常用命令（在本文件所在目录执行）：
+#   docker compose up -d --build   构建并启动（更新代码后也用这条）
+#   docker compose ps              查看三个容器的状态
+#   docker compose logs -f backend 查看后端日志（Ctrl+C 退出）
+
+name: hanghai
+
+services:
+  db:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: campus
+      POSTGRES_USER: campus_app
+      # .env 里没填 DB_PASSWORD 时直接报错，不会用空密码启动
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?请在 .env 中设置 DB_PASSWORD}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      # 数据库第一次启动（数据卷为空）时自动执行建表脚本；以后启动不会重复执行
+      - ./backend/sql/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    # 健康检查：数据库真正能接受连接了才算「健康」，后端等它健康后再启动
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U campus_app -d campus"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    # 把 .env 里的密钥（JWT_SECRET、WECHAT_AES_KEY、LLM_API_KEY……）传给后端
+    env_file: .env
+    environment:
+      # 数据库地址里的主机名 db 就是上面的数据库容器
+      DATABASE_URL: postgresql+psycopg://campus_app:${DB_PASSWORD}@db:5432/campus
+      UPLOAD_DIR: /app/uploads
+      # 图片地址用相对路径 /uploads/...，由 Nginx 直接提供
+      UPLOAD_BASE_URL: /uploads
+    volumes:
+      - uploads:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      # 只读挂载：Nginx 只需要读图片，不能改
+      - uploads:/srv/uploads:ro
+    depends_on:
+      - backend
+
+volumes:
+  db-data:
+  uploads:

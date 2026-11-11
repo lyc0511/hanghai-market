@@ -296,3 +296,28 @@ def test_draft_respects_daily_limit(client, db, make_user, item_category_id, mon
     ])
     r = ask(client, "再卖一个", h)
     assert tool_message(seen)["ok"] is False and r["data"]["draft"] is None
+
+
+# ------------------------------------------------------------ 全站每日上限
+
+def test_global_daily_quota_falls_back(client, db, monkeypatch):
+    """全站今天调用大模型的次数到上限后，不再请求大模型，自动降级；降级的回答不计入额度。"""
+    from datetime import datetime
+    from sqlalchemy import func
+    today_start = datetime.combine(datetime.now(assistant.LOCAL_TZ).date(), datetime.min.time(), tzinfo=assistant.LOCAL_TZ)
+    used_before = db.scalar(select(func.count()).select_from(AiMessage).where(
+        AiMessage.created_at >= today_start, AiMessage.fallback.is_(False)))
+    monkeypatch.setattr(assistant.settings, "ASSISTANT_GLOBAL_PER_DAY", used_before + 1)
+
+    seen = fake_llm(monkeypatch, [{"content": "第一次正常回答"}])
+    r1 = ask(client, "第一个问题")
+    assert r1["data"]["fallback"] is False and len(seen) == 1
+
+    r2 = ask(client, "第二个问题")  # 额度已满：不再调用大模型
+    assert r2["data"]["fallback"] is True and len(seen) == 1
+    r3 = ask(client, "第三个问题")  # 降级的那次不计数，所以仍是满的
+    assert r3["data"]["fallback"] is True and len(seen) == 1
+
+    monkeypatch.setattr(assistant.settings, "ASSISTANT_GLOBAL_PER_DAY", 0)  # 0 = 不限制
+    fake_llm(monkeypatch, [{"content": "不限制时正常"}])
+    assert ask(client, "第四个问题")["data"]["fallback"] is False

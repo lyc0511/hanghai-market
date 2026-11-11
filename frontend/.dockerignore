@@ -1,0 +1,7 @@
+# 构建镜像时不发送给 Docker 的文件：依赖在容器里重新安装，打包结果在容器里重新生成
+node_modules/
+dist/
+.vscode/
+.idea/
+*.log
+.env*

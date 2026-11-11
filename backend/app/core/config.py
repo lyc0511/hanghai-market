@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     LLM_TIMEOUT_SECONDS: float = 30
     ASSISTANT_PER_MINUTE: int = 6  # 每个用户（游客按 IP）每分钟最多提问次数
     ASSISTANT_PER_DAY: int = 60  # 每天最多提问次数，防止额度被刷光
+    # 全站每天最多真正调用大模型的次数（北京时间零点清零），超过后自动降级为关键词搜索；0 表示不限制。
+    # 防止游客换 IP 绕过上面的单人限制把额度刷光。按每次约 0.002 元估算，300 次 ≈ 每天最多 0.6 元
+    ASSISTANT_GLOBAL_PER_DAY: int = 300
     EMBEDDING_API_BASE: str = ""
     EMBEDDING_API_KEY: str = ""
     EMBEDDING_MODEL: str = ""
