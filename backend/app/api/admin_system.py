@@ -100,6 +100,7 @@ def dashboard(
         intents_completed=count(db, TradeIntent, TradeIntent.status == "completed"),
         todo_items=count(db, Content, Content.type == "item", Content.status == "pending"),
         todo_activities=count(db, Content, Content.type == "activity", Content.status == "pending"),
+        todo_posts=count(db, Content, Content.type == "post", Content.status == "pending"),
         todo_reports=count(db, Report, Report.status == "pending"),
         todo_clubs=count(db, ClubApplication, ClubApplication.status == "pending"),
         trend=trend,

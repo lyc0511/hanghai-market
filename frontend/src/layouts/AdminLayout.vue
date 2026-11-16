@@ -1,6 +1,6 @@
 <!-- 管理后台外壳（电脑端）：左侧菜单 + 顶栏 + 内容区，使用 Element Plus -->
 <script setup>
-import { Calendar, DataAnalysis, Document, Goods, User, Warning, HomeFilled, SwitchButton } from '@element-plus/icons-vue'
+import { Calendar, ChatLineSquare, DataAnalysis, Document, Goods, User, Warning, HomeFilled, SwitchButton } from '@element-plus/icons-vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { useUserStore } from '@/stores/user'
@@ -37,6 +37,10 @@ function logout() {
         <el-menu-item index="admin-activities" :route="{ name: 'admin-activities' }">
           <el-icon><Calendar /></el-icon>
           <span>活动审核</span>
+        </el-menu-item>
+        <el-menu-item index="admin-posts" :route="{ name: 'admin-posts' }">
+          <el-icon><ChatLineSquare /></el-icon>
+          <span>墙审核</span>
         </el-menu-item>
         <el-menu-item index="admin-reports" :route="{ name: 'admin-reports' }">
           <el-icon><Warning /></el-icon>

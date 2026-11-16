@@ -3,7 +3,7 @@
   手机宽度下，导航和搜索收进左侧抽屉菜单。
 -->
 <script setup>
-import { Bell, ChevronDown, LogOut, Menu, Package, Plus, Search, Settings, ShoppingBag, User, Users } from '@lucide/vue'
+import { Bell, ChevronDown, LogOut, Menu, Package, PenLine, Plus, Search, Settings, ShoppingBag, User, Users } from '@lucide/vue'
 import { ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -44,6 +44,7 @@ const NAV = [
   { to: '/market', label: '二手' },
   { to: '/clubs', label: '社团' },
   { to: '/activities', label: '活动' },
+  { to: '/wall', label: '墙' },
 ]
 
 const keyword = ref('')
@@ -139,6 +140,7 @@ function logout() {
             <DropdownMenuSeparator />
             <DropdownMenuItem @select="go('me')"><User />个人中心</DropdownMenuItem>
             <DropdownMenuItem @select="go('my-items')"><Package />我发布的</DropdownMenuItem>
+            <DropdownMenuItem @select="go('my-posts')"><PenLine />我的投稿</DropdownMenuItem>
             <DropdownMenuItem @select="go('my-clubs')"><Users />我的社团</DropdownMenuItem>
             <DropdownMenuItem @select="go('my-intents')"><ShoppingBag />我的意向</DropdownMenuItem>
             <DropdownMenuItem @select="go('notifications')"><Bell />消息通知</DropdownMenuItem>

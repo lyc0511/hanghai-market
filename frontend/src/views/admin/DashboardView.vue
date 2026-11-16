@@ -19,6 +19,7 @@ const TODOS = computed(() => {
   return [
     { label: '待审核物品', value: d.todo_items, to: { name: 'admin-items' } },
     { label: '待审核活动', value: d.todo_activities, to: { name: 'admin-activities' } },
+    { label: '待审核投稿', value: d.todo_posts, to: { name: 'admin-posts' } },
     { label: '待处理举报', value: d.todo_reports, to: { name: 'admin-reports' } },
   ]
 })
@@ -126,7 +127,7 @@ onMounted(async () => {
 }
 .todos {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 16px;
 }
 .todo {

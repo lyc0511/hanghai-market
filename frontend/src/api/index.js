@@ -36,6 +36,15 @@ export const itemApi = {
   remove: (id) => http.delete(`/items/${id}`),
 }
 
+export const postApi = {
+  list: (params) => http.get('/posts', { params }),
+  detail: (id) => http.get(`/posts/${id}`),
+  mine: (params) => http.get('/posts/mine', { params }),
+  create: (body) => http.post('/posts', body),
+  update: (id, body) => http.put(`/posts/${id}`, body),
+  withdraw: (id) => http.delete(`/posts/${id}`),
+}
+
 export const intentApi = {
   create: (itemId, message) => http.post('/intents', { item_id: itemId, message }),
   mine: (params) => http.get('/intents/mine', { params }),
@@ -66,6 +75,9 @@ export const adminApi = {
   activities: (params) => http.get('/admin/activities', { params }),
   approveActivity: (id) => http.post(`/admin/activities/${id}/approve`),
   rejectActivity: (id, reason) => http.post(`/admin/activities/${id}/reject`, { reason }),
+  posts: (params) => http.get('/admin/posts', { params }),
+  approvePost: (id) => http.post(`/admin/posts/${id}/approve`),
+  rejectPost: (id, reason) => http.post(`/admin/posts/${id}/reject`, { reason }),
   reports: (params) => http.get('/admin/reports', { params }),
   handleReport: (id, data) => http.post(`/admin/reports/${id}/handle`, data),
   dashboard: (params) => http.get('/admin/dashboard', { params }),

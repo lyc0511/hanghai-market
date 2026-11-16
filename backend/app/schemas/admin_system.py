@@ -26,6 +26,7 @@ class DashboardOut(BaseModel):
     intents_completed: int
     todo_items: int = Field(description="待审核物品")
     todo_activities: int = Field(description="待审核活动")
+    todo_posts: int = Field(description="待审核的校园墙投稿")
     todo_reports: int = Field(description="待处理举报")
     todo_clubs: int = Field(description="待审核入社申请（由会长处理，这里只展示）")
     trend: list[DayCount] = Field(description="最近 N 天（北京时间）每天新增")

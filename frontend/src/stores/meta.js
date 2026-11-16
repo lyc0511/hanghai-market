@@ -1,5 +1,5 @@
 /**
- * 字典数据：枚举中文名、校区、物品类目。只请求一次，全站共用。
+ * 字典数据：枚举中文名、校区、物品类目、校园墙标签。只请求一次，全站共用。
  */
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
@@ -9,14 +9,16 @@ import { metaApi } from '@/api'
 export const useMetaStore = defineStore('meta', () => {
   const enums = ref(null)
   const itemCategories = ref([])
+  const postTags = ref([])
   let loading = null
 
   function load() {
     if (!loading) {
-      loading = Promise.all([metaApi.enums(), metaApi.categories('item')])
-        .then(([e, cats]) => {
+      loading = Promise.all([metaApi.enums(), metaApi.categories('item'), metaApi.categories('post')])
+        .then(([e, cats, tags]) => {
           enums.value = e
           itemCategories.value = cats
+          postTags.value = tags
         })
         .catch((err) => {
           loading = null // 失败时允许下次重试
@@ -31,5 +33,5 @@ export const useMetaStore = defineStore('meta', () => {
     return enums.value?.[group]?.[value] ?? value
   }
 
-  return { enums, itemCategories, load, label }
+  return { enums, itemCategories, postTags, load, label }
 })
