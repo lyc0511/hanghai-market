@@ -1,12 +1,14 @@
 <!--
   墙上的一条帖子。信息流和详情页共用：
-    clamp  = true 时正文最多显示 6 行（信息流里用），点正文进详情
+    clamp  = true 时正文最多显示 6 行（信息流里用），点正文或评论数进详情
   匿名：帖子数据里本来就没有投稿人信息，这里统一显示「匿名同学」。
+  点赞在卡片内部完成：先立刻变色（不等服务器），失败了再改回去。
 -->
 <script setup>
 import { CircleCheck, Heart, MessageCircle, Megaphone, Pin, UserRound } from '@lucide/vue'
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 
+import { postApi } from '@/api'
 import { tagClass } from '@/lib/wall'
 import { timeAgo } from '@/lib/time'
 
@@ -14,6 +16,39 @@ const props = defineProps({
   post: { type: Object, required: true },
   clamp: { type: Boolean, default: false },
 })
+
+const liked = ref(props.post.liked)
+const likeCount = ref(props.post.like_count)
+const liking = ref(false)
+// 父组件重新拿到数据时（比如刷新），跟着更新
+watch(
+  () => [props.post.liked, props.post.like_count],
+  ([l, n]) => {
+    liked.value = l
+    likeCount.value = n
+  },
+)
+
+const canInteract = computed(() => props.post.status === 'online')
+
+async function toggleLike() {
+  if (liking.value || !canInteract.value) return
+  liking.value = true
+  const before = { liked: liked.value, count: likeCount.value }
+  // 先改界面，再等服务器结果
+  liked.value = !before.liked
+  likeCount.value = before.count + (before.liked ? -1 : 1)
+  try {
+    const r = before.liked ? await postApi.unlike(props.post.id) : await postApi.like(props.post.id)
+    liked.value = r.liked
+    likeCount.value = r.like_count
+  } catch {
+    liked.value = before.liked
+    likeCount.value = before.count
+  } finally {
+    liking.value = false
+  }
+}
 
 // 1 张图放大显示；2 张或 4 张排两列；3 张排三列
 const gridClass = computed(() => {
@@ -74,10 +109,30 @@ const gridClass = computed(() => {
       </a>
     </div>
 
-    <footer class="mt-3 flex items-center gap-5 text-sm text-muted-foreground">
-      <span class="inline-flex items-center gap-1.5"><Heart class="size-4" />{{ post.like_count || '赞' }}</span>
-      <span class="inline-flex items-center gap-1.5"><MessageCircle class="size-4" />{{ post.comment_count || '评论' }}</span>
+    <footer class="mt-3 flex items-center gap-1 text-sm text-muted-foreground">
+      <button
+        type="button"
+        class="-ml-2 inline-flex items-center gap-1.5 rounded-full px-2 py-1 transition-colors disabled:cursor-default"
+        :class="liked ? 'text-rose-500' : canInteract ? 'hover:bg-rose-50 hover:text-rose-500' : ''"
+        :disabled="!canInteract"
+        :aria-pressed="liked"
+        :aria-label="liked ? '取消点赞' : '点赞'"
+        @click="toggleLike"
+      >
+        <Heart class="size-4 transition-transform" :class="liked ? 'scale-110 fill-current' : ''" />
+        <span class="tabular-nums">{{ likeCount || '赞' }}</span>
+      </button>
+      <component
+        :is="clamp ? 'router-link' : 'span'"
+        :to="clamp ? { name: 'wall-post', params: { id: post.id }, hash: '#comments' } : undefined"
+        class="inline-flex items-center gap-1.5 rounded-full px-2 py-1"
+        :class="clamp ? 'transition-colors hover:bg-secondary hover:text-ocean' : ''"
+      >
+        <MessageCircle class="size-4" />
+        <span class="tabular-nums">{{ post.comment_count || '评论' }}</span>
+      </component>
       <span v-if="post.resolved" class="ml-auto inline-flex items-center gap-1 text-kelp"><CircleCheck class="size-4" />已解决</span>
+      <span v-else class="ml-auto"><slot name="actions" /></span>
     </footer>
   </article>
 </template>

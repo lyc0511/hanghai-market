@@ -37,6 +37,7 @@ ENUMS = EnumsOut(
         "false_info": "虚假信息",
         "spam": "广告刷屏",
         "abuse": "辱骂骚扰",
+        "privacy": "泄露隐私",
         "other": "其他",
     },
     campus_area=CAMPUS_AREAS,

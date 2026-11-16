@@ -57,10 +57,49 @@ class PostOut(BaseModel):
     pinned: bool
     resolved: bool = Field(description="投稿人已标记「已解决」")
     like_count: int
+    liked: bool = Field(default=False, description="当前登录用户是否点过赞")
     comment_count: int
     published_at: datetime | None = Field(description="上墙时间；未通过审核时为空")
     created_at: datetime | None = Field(description="投稿时间，仅投稿人本人和管理员可见")
     reject_reason: str | None = Field(description="退回原因，仅投稿人本人和管理员可见")
+
+
+class LikeOut(BaseModel):
+    liked: bool
+    like_count: int
+
+
+COMMENT_MAX = 300
+
+
+class CommentCreateIn(BaseModel):
+    body: str = Field(description=f"评论内容，1–{COMMENT_MAX} 字")
+    reply_to_id: int | None = Field(default=None, description="回复哪条评论；不填表示直接评论帖子")
+
+    @field_validator("body")
+    @classmethod
+    def check_body(cls, v: str) -> str:
+        v = v.strip()
+        if not 1 <= len(v) <= COMMENT_MAX:
+            raise ValueError(f"评论应为 1–{COMMENT_MAX} 个字")
+        return v
+
+
+class CommentReplyTo(BaseModel):
+    id: int
+    name: str = Field(description="被回复者显示的名字：昵称，或者「楼主」")
+
+
+class CommentOut(BaseModel):
+    """一条评论。评论显示昵称；但投稿人在自己帖子下的评论显示为「楼主」，不带昵称（is_op=true, nickname=null）。"""
+
+    id: int
+    body: str
+    nickname: str | None = Field(description="评论人昵称；楼主的评论为空")
+    is_op: bool = Field(description="是不是楼主（帖子的投稿人）发的")
+    is_mine: bool = Field(description="是不是当前登录用户发的")
+    reply_to: CommentReplyTo | None
+    created_at: datetime
 
 
 class PostAuthor(BaseModel):

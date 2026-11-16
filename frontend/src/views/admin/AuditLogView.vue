@@ -10,13 +10,17 @@ const ACTIONS = {
   reject_item: { label: '物品审核驳回', type: 'warning' },
   approve_activity: { label: '活动审核通过', type: 'success' },
   reject_activity: { label: '活动审核驳回', type: 'warning' },
+  approve_post: { label: '投稿审核通过', type: 'success' },
+  reject_post: { label: '投稿审核退回', type: 'warning' },
+  offline_post: { label: '下架帖子', type: 'danger' },
+  offline_comment: { label: '下架评论', type: 'danger' },
   resolve_report: { label: '举报属实', type: 'danger' },
   dismiss_report: { label: '驳回举报', type: 'info' },
   ban_user: { label: '封禁用户', type: 'danger' },
   unban_user: { label: '解除封禁', type: 'success' },
 }
-const TARGET_PATH = { item: '/items/', activity: '/activities/', club: '/clubs/' }
-const TYPE_LABELS = { item: '物品', club: '社团', activity: '活动', report: '举报', user: '用户' }
+const TARGET_PATH = { item: '/items/', activity: '/activities/', club: '/clubs/', post: '/wall/' }
+const TYPE_LABELS = { item: '物品', club: '社团', activity: '活动', post: '帖子', comment: '评论', report: '举报', user: '用户' }
 
 const query = reactive({ action: '', page: 1, page_size: 20 })
 const rows = ref([])

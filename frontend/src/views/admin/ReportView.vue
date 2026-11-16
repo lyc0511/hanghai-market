@@ -15,8 +15,8 @@ const TABS = [
   { name: 'resolved', label: '举报属实' },
   { name: 'dismissed', label: '已驳回' },
 ]
-const TYPE_LABELS = { item: '物品', club: '社团', activity: '活动' }
-const REASON_LABELS = { fraud: '疑似诈骗', prohibited: '违禁物品', false_info: '虚假信息', spam: '广告刷屏', abuse: '辱骂骚扰', other: '其他' }
+const TYPE_LABELS = { item: '物品', club: '社团', activity: '活动', post: '帖子', comment: '评论' }
+const REASON_LABELS = { fraud: '疑似诈骗', prohibited: '违禁物品', false_info: '虚假信息', spam: '广告刷屏', abuse: '辱骂骚扰', privacy: '泄露隐私', other: '其他' }
 const CONTENT_STATUS = { online: '展示中', offline: '已下架', pending: '待审核', rejected: '已驳回', deleted: '已删除' }
 const QUICK = {
   resolve: ['经核实内容违规，已下架处理', '经核实存在虚假描述，已下架处理', '已联系发布者整改'],

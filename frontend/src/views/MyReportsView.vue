@@ -9,8 +9,8 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatDateTime } from '@/lib/time'
 
-const TYPE_LABELS = { item: '物品', club: '社团', activity: '活动' }
-const REASON_LABELS = { fraud: '疑似诈骗', prohibited: '违禁物品', false_info: '虚假信息', spam: '广告刷屏', abuse: '辱骂骚扰', other: '其他' }
+const TYPE_LABELS = { item: '物品', club: '社团', activity: '活动', post: '帖子', comment: '评论' }
+const REASON_LABELS = { fraud: '疑似诈骗', prohibited: '违禁物品', false_info: '虚假信息', spam: '广告刷屏', abuse: '辱骂骚扰', privacy: '泄露隐私', other: '其他' }
 const STATUS = {
   pending: { label: '处理中', cls: 'bg-buoy/10 text-buoy' },
   resolved: { label: '举报属实', cls: 'bg-kelp/10 text-kelp' },

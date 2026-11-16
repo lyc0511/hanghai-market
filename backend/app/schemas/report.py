@@ -4,8 +4,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-TargetType = Literal["item", "club", "activity"]
-Reason = Literal["fraud", "prohibited", "false_info", "spam", "abuse", "other"]
+TargetType = Literal["item", "club", "activity", "post", "comment"]
+Reason = Literal["fraud", "prohibited", "false_info", "spam", "abuse", "privacy", "other"]
 ReportStatus = Literal["pending", "resolved", "dismissed"]
 
 

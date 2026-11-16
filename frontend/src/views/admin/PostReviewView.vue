@@ -33,7 +33,12 @@ const total = ref(0)
 const loading = ref(false)
 const busyId = ref(null)
 
-const rejectDialog = reactive({ visible: false, post: null, reason: '', submitting: false })
+// 退回（待审核的帖子）和下架（已上墙的帖子）共用一个弹窗，用 mode 区分
+const rejectDialog = reactive({ visible: false, mode: 'reject', post: null, reason: '', submitting: false })
+const DIALOG_TEXT = {
+  reject: { title: '退回投稿', confirm: '确认退回', done: '已退回，已通知投稿人', hint: '退回原因会通知给投稿人，对方可以修改后重新投稿，2–200 字' },
+  offline: { title: '下架帖子', confirm: '确认下架', done: '已下架，已通知投稿人', hint: '下架原因会通知给投稿人，2–200 字' },
+}
 
 async function load() {
   loading.value = true
@@ -71,20 +76,21 @@ async function approve(row) {
   }
 }
 
-function openReject(row) {
-  Object.assign(rejectDialog, { visible: true, post: row, reason: '', submitting: false })
+function openReject(row, mode = 'reject') {
+  Object.assign(rejectDialog, { visible: true, mode, post: row, reason: '', submitting: false })
 }
 
 async function submitReject() {
   const reason = rejectDialog.reason.trim()
   if (reason.length < 2 || reason.length > 200) {
-    ElMessage.warning('退回原因 2–200 个字')
+    ElMessage.warning('原因 2–200 个字')
     return
   }
   rejectDialog.submitting = true
   try {
-    await adminApi.rejectPost(rejectDialog.post.id, reason)
-    ElMessage.success('已退回，已通知投稿人')
+    const api = rejectDialog.mode === 'offline' ? adminApi.offlinePost : adminApi.rejectPost
+    await api(rejectDialog.post.id, reason)
+    ElMessage.success(DIALOG_TEXT[rejectDialog.mode].done)
     rejectDialog.visible = false
     load()
   } finally {
@@ -145,14 +151,17 @@ onMounted(load)
       <el-table-column label="投稿时间" width="160">
         <template #default="{ row }">{{ formatDateTime(row.created_at) }}</template>
       </el-table-column>
-      <el-table-column :label="query.status === 'pending' ? '操作' : '备注'" width="170" fixed="right">
+      <el-table-column :label="['pending', 'online'].includes(query.status) ? '操作' : '备注'" width="190" fixed="right">
         <template #default="{ row }">
           <template v-if="row.status === 'pending'">
             <el-button type="primary" size="small" :loading="busyId === row.id" @click="approve(row)">通过</el-button>
             <el-button type="danger" size="small" plain :disabled="busyId === row.id" @click="openReject(row)">退回</el-button>
           </template>
+          <template v-else-if="row.status === 'online'">
+            <div class="muted">{{ formatDateTime(row.published_at) }} 上墙</div>
+            <el-button type="danger" size="small" plain class="mt" @click="openReject(row, 'offline')">下架</el-button>
+          </template>
           <span v-else-if="row.reject_reason" class="reason">{{ row.reject_reason }}</span>
-          <span v-else-if="row.published_at" class="muted">{{ formatDateTime(row.published_at) }} 上墙</span>
           <span v-else class="muted">—</span>
         </template>
       </el-table-column>
@@ -172,7 +181,7 @@ onMounted(load)
     </div>
   </el-card>
 
-  <el-dialog v-model="rejectDialog.visible" title="退回投稿" width="520px">
+  <el-dialog v-model="rejectDialog.visible" :title="DIALOG_TEXT[rejectDialog.mode].title" width="520px">
     <p class="dialog-body">{{ rejectDialog.post?.body }}</p>
     <div class="quick">
       <el-tag v-for="r in QUICK_REASONS" :key="r" class="quick-tag" effect="plain" @click="rejectDialog.reason = r">
@@ -185,11 +194,11 @@ onMounted(load)
       :rows="3"
       maxlength="200"
       show-word-limit
-      placeholder="退回原因会通知给投稿人，对方可以修改后重新投稿，2–200 字"
+      :placeholder="DIALOG_TEXT[rejectDialog.mode].hint"
     />
     <template #footer>
       <el-button @click="rejectDialog.visible = false">取消</el-button>
-      <el-button type="danger" :loading="rejectDialog.submitting" @click="submitReject">确认退回</el-button>
+      <el-button type="danger" :loading="rejectDialog.submitting" @click="submitReject">{{ DIALOG_TEXT[rejectDialog.mode].confirm }}</el-button>
     </template>
   </el-dialog>
 </template>
@@ -235,6 +244,9 @@ onMounted(load)
 .reason {
   color: var(--danger);
   font-size: 12px;
+}
+.mt {
+  margin-top: 6px;
 }
 .pager {
   margin-top: 16px;

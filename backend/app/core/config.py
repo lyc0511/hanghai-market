@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     EMBEDDING_MODEL: str = ""
     DAILY_PUBLISH_LIMIT: int = 10
     WALL_DAILY_POST_LIMIT: int = 5  # 校园墙：每人每天最多投稿条数（撤回的也算，防止反复刷）
+    WALL_DAILY_COMMENT_LIMIT: int = 50  # 校园墙：每人每天最多评论条数（删除的也算）
 
     model_config = SettingsConfigDict(
         env_file=BASE_DIR / ".env",

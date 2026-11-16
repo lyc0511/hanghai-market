@@ -1,5 +1,6 @@
 <!--
-  举报按钮 + 弹窗：物品 / 社团 / 活动详情页共用。
+  举报按钮 + 弹窗：物品 / 社团 / 活动 / 帖子 / 评论共用。
+  compact = true 时显示成一个小的文字按钮（评论区里用）。
   未登录点击 → 先弹登录框；提交成功后按钮变成「已举报」。
 -->
 <script setup>
@@ -15,12 +16,13 @@ import { cn } from '@/lib/utils'
 import { useUserStore } from '@/stores/user'
 
 const props = defineProps({
-  targetType: { type: String, required: true }, // item | club | activity
+  targetType: { type: String, required: true }, // item | club | activity | post | comment
   targetId: { type: Number, required: true },
   class: { type: String, default: '' },
+  compact: { type: Boolean, default: false },
 })
 
-const REASONS = [
+const CONTENT_REASONS = [
   { value: 'fraud', label: '疑似诈骗' },
   { value: 'prohibited', label: '违禁物品' },
   { value: 'false_info', label: '虚假信息' },
@@ -28,7 +30,18 @@ const REASONS = [
   { value: 'abuse', label: '辱骂骚扰' },
   { value: 'other', label: '其他' },
 ]
-const NAMES = { item: '物品', club: '社团', activity: '活动' }
+// 帖子和评论的常见问题不一样：把「泄露隐私」「辱骂骚扰」放在最前面
+const WALL_REASONS = [
+  { value: 'privacy', label: '泄露隐私' },
+  { value: 'abuse', label: '辱骂骚扰' },
+  { value: 'spam', label: '广告刷屏' },
+  { value: 'false_info', label: '虚假信息' },
+  { value: 'fraud', label: '疑似诈骗' },
+  { value: 'other', label: '其他' },
+]
+const NAMES = { item: '物品', club: '社团', activity: '活动', post: '帖子', comment: '评论' }
+const isWall = computed(() => ['post', 'comment'].includes(props.targetType))
+const REASONS = computed(() => (isWall.value ? WALL_REASONS : CONTENT_REASONS))
 
 const user = useUserStore()
 const open = ref(false)
@@ -72,7 +85,17 @@ async function submit() {
 </script>
 
 <template>
+  <button
+    v-if="compact"
+    type="button"
+    :class="cn('text-xs text-muted-foreground hover:text-destructive disabled:opacity-60', props.class)"
+    :disabled="done"
+    @click="start"
+  >
+    {{ done ? '已举报' : '举报' }}
+  </button>
   <Button
+    v-else
     variant="ghost"
     size="sm"
     :class="cn('text-muted-foreground hover:text-destructive', props.class)"
@@ -106,7 +129,7 @@ async function submit() {
         <label for="report-desc" class="mb-2 block text-sm font-medium">
           补充说明<span class="font-normal text-muted-foreground">{{ needDesc ? '（必填）' : '（选填）' }}</span>
         </label>
-        <Textarea id="report-desc" v-model="desc" rows="3" maxlength="300" placeholder="比如：价格明显低于市场价，要求先转账……" />
+        <Textarea id="report-desc" v-model="desc" rows="3" maxlength="300" :placeholder="isWall ? '比如：帖子里写了某位同学的姓名和宿舍号……' : '比如：价格明显低于市场价，要求先转账……'" />
         <div class="mt-1 text-right text-xs text-muted-foreground">{{ desc.length }}/300</div>
       </div>
 

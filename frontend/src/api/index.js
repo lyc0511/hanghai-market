@@ -43,6 +43,13 @@ export const postApi = {
   create: (body) => http.post('/posts', body),
   update: (id, body) => http.put(`/posts/${id}`, body),
   withdraw: (id) => http.delete(`/posts/${id}`),
+  like: (id) => http.post(`/posts/${id}/like`),
+  unlike: (id) => http.delete(`/posts/${id}/like`),
+  resolve: (id) => http.post(`/posts/${id}/resolve`),
+  unresolve: (id) => http.delete(`/posts/${id}/resolve`),
+  comments: (id, params) => http.get(`/posts/${id}/comments`, { params }),
+  addComment: (id, body, replyToId) => http.post(`/posts/${id}/comments`, { body, reply_to_id: replyToId ?? null }),
+  removeComment: (id, commentId) => http.delete(`/posts/${id}/comments/${commentId}`),
 }
 
 export const intentApi = {
@@ -78,6 +85,7 @@ export const adminApi = {
   posts: (params) => http.get('/admin/posts', { params }),
   approvePost: (id) => http.post(`/admin/posts/${id}/approve`),
   rejectPost: (id, reason) => http.post(`/admin/posts/${id}/reject`, { reason }),
+  offlinePost: (id, reason) => http.post(`/admin/posts/${id}/offline`, { reason }),
   reports: (params) => http.get('/admin/reports', { params }),
   handleReport: (id, data) => http.post(`/admin/reports/${id}/handle`, data),
   dashboard: (params) => http.get('/admin/dashboard', { params }),
