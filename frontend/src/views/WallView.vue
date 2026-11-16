@@ -1,5 +1,6 @@
 <!--
-  墙：一条信息流 + 标签筛选 + 搜索。只有登录的同学能看到内容，游客看到的是登录提示。
+  墙：一条信息流 + 标签筛选 + 搜索。只有登录的同学能看到内容；
+  游客看到的是登录提示和几个数字（今天新增多少、各标签有多少），证明里面是活的，但不透露任何内容。
   排序由后端决定：置顶在最前，其余按上墙时间从新到旧。
 -->
 <script setup>
@@ -13,6 +14,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useMetaStore } from '@/stores/meta'
+import { tagClass } from '@/lib/wall'
 import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
@@ -28,6 +30,7 @@ const posts = ref([])
 const page = ref(0)
 const total = ref(0)
 const loading = ref(false)
+const summary = ref(null) // 游客看的统计数字
 // 每次重新加载加 1：筛选切换得很快时，丢弃旧请求晚到的结果
 let loadSeq = 0
 
@@ -58,6 +61,14 @@ function reload() {
   loadMore()
 }
 
+async function loadSummary() {
+  try {
+    summary.value = await postApi.summary()
+  } catch {
+    summary.value = null // 拿不到数字不影响登录提示
+  }
+}
+
 function onSearch() {
   keyword.value = keywordInput.value.trim()
 }
@@ -73,13 +84,17 @@ watch(
   () => user.isLoggedIn,
   (v) => {
     if (v) reload()
-    else posts.value = []
+    else {
+      posts.value = []
+      loadSummary()
+    }
   },
 )
 
 onMounted(() => {
   meta.load().catch(() => {})
   if (user.isLoggedIn) loadMore()
+  else loadSummary()
 })
 </script>
 
@@ -98,6 +113,23 @@ onMounted(() => {
       <span class="mx-auto grid size-14 place-items-center rounded-full bg-secondary text-ocean/60"><Lock class="size-6" /></span>
       <p class="mt-4 text-lg font-medium text-ocean">墙上的内容只对登录的同学开放</p>
       <p class="mt-1 text-sm text-muted-foreground">登录后可以看墙、匿名投稿和评论</p>
+
+      <template v-if="summary && summary.total > 0">
+        <p class="mt-6 text-sm text-ocean">
+          <template v-if="summary.today > 0">今天新上墙 <strong class="text-xl tabular-nums text-buoy">{{ summary.today }}</strong> 条，</template>
+          墙上共 <strong class="text-xl tabular-nums">{{ summary.total }}</strong> 条
+        </p>
+        <div class="mt-3 flex flex-wrap justify-center gap-1.5">
+          <span
+            v-for="t in summary.tags.filter((x) => x.count > 0)"
+            :key="t.slug"
+            class="rounded-full px-2.5 py-1 text-xs font-medium"
+            :class="tagClass(t.slug)"
+          >
+            {{ t.name }} {{ t.count }}
+          </span>
+        </div>
+      </template>
       <div class="mt-6 flex justify-center gap-3">
         <Button @click="user.openLogin('login')">登录</Button>
         <Button variant="outline" @click="user.openLogin('register')">注册</Button>

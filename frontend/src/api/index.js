@@ -38,6 +38,8 @@ export const itemApi = {
 
 export const postApi = {
   list: (params) => http.get('/posts', { params }),
+  /** 游客也能调用：只有数字（今天新增、总数、各标签数量），没有帖子内容 */
+  summary: () => http.get('/posts/summary'),
   detail: (id) => http.get(`/posts/${id}`),
   mine: (params) => http.get('/posts/mine', { params }),
   create: (body) => http.post('/posts', body),
@@ -86,6 +88,9 @@ export const adminApi = {
   approvePost: (id) => http.post(`/admin/posts/${id}/approve`),
   rejectPost: (id, reason) => http.post(`/admin/posts/${id}/reject`, { reason }),
   offlinePost: (id, reason) => http.post(`/admin/posts/${id}/offline`, { reason }),
+  createOfficialPost: (body) => http.post('/admin/posts', body),
+  pinPost: (id) => http.post(`/admin/posts/${id}/pin`),
+  unpinPost: (id) => http.delete(`/admin/posts/${id}/pin`),
   reports: (params) => http.get('/admin/reports', { params }),
   handleReport: (id, data) => http.post(`/admin/reports/${id}/handle`, data),
   dashboard: (params) => http.get('/admin/dashboard', { params }),

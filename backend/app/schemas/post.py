@@ -38,6 +38,12 @@ class PostCreateIn(BaseModel):
         return v
 
 
+class OfficialPostIn(PostCreateIn):
+    """管理员发布官方帖：不用审核，直接上墙。"""
+
+    pinned: bool = Field(default=False, description="是否同时置顶")
+
+
 class PostTag(BaseModel):
     id: int
     name: str
@@ -62,6 +68,20 @@ class PostOut(BaseModel):
     published_at: datetime | None = Field(description="上墙时间；未通过审核时为空")
     created_at: datetime | None = Field(description="投稿时间，仅投稿人本人和管理员可见")
     reject_reason: str | None = Field(description="退回原因，仅投稿人本人和管理员可见")
+
+
+class TagCount(BaseModel):
+    name: str
+    slug: str
+    count: int
+
+
+class WallSummaryOut(BaseModel):
+    """给没登录的人看的统计：只有数字，没有任何帖子内容。"""
+
+    today: int = Field(description="今天（北京时间）新上墙的帖子数")
+    total: int = Field(description="墙上的帖子总数")
+    tags: list[TagCount] = Field(description="各标签下的帖子数")
 
 
 class LikeOut(BaseModel):

@@ -9,7 +9,10 @@ import 'element-plus/es/components/message-box/style/css'
 import { onMounted, reactive, ref } from 'vue'
 
 import { adminApi } from '@/api'
+import { useMetaStore } from '@/stores/meta'
 import { formatDateTime } from '@/lib/time'
+
+const meta = useMetaStore()
 
 const TABS = [
   { name: 'pending', label: '待审核' },
@@ -76,6 +79,40 @@ async function approve(row) {
   }
 }
 
+// 发布官方帖：不用审核，直接上墙
+const official = reactive({ visible: false, tagId: null, body: '', pinned: true, submitting: false })
+
+function openOfficial() {
+  Object.assign(official, { visible: true, tagId: meta.postTags.find((t) => t.slug === 'other')?.id ?? null, body: '', pinned: true })
+}
+
+async function submitOfficial() {
+  const body = official.body.trim()
+  if (!official.tagId) return ElMessage.warning('请选择标签')
+  if (body.length < 2 || body.length > 500) return ElMessage.warning('正文 2–500 个字')
+  official.submitting = true
+  try {
+    await adminApi.createOfficialPost({ tag_id: official.tagId, body, pinned: official.pinned })
+    ElMessage.success('已发布')
+    official.visible = false
+    query.status = 'online'
+    onTab()
+  } finally {
+    official.submitting = false
+  }
+}
+
+async function togglePin(row) {
+  busyId.value = row.id
+  try {
+    await (row.pinned ? adminApi.unpinPost(row.id) : adminApi.pinPost(row.id))
+    ElMessage.success(row.pinned ? '已取消置顶' : '已置顶')
+    load()
+  } finally {
+    busyId.value = null
+  }
+}
+
 function openReject(row, mode = 'reject') {
   Object.assign(rejectDialog, { visible: true, mode, post: row, reason: '', submitting: false })
 }
@@ -98,18 +135,28 @@ async function submitReject() {
   }
 }
 
-onMounted(load)
+onMounted(() => {
+  meta.load().catch(() => {})
+  load()
+})
 </script>
 
 <template>
   <el-card shadow="never" class="panel">
-    <el-tabs v-model="query.status" @tab-change="onTab">
-      <el-tab-pane v-for="t in TABS" :key="t.name" :name="t.name" :label="t.label" />
-    </el-tabs>
+    <div class="top">
+      <el-tabs v-model="query.status" class="tabs" @tab-change="onTab">
+        <el-tab-pane v-for="t in TABS" :key="t.name" :name="t.name" :label="t.label" />
+      </el-tabs>
+      <el-button type="primary" plain @click="openOfficial">发布官方帖</el-button>
+    </div>
 
     <el-table v-loading="loading" :data="rows" row-key="id" empty-text="暂无数据">
       <el-table-column label="内容" min-width="360">
         <template #default="{ row }">
+          <div class="marks">
+            <el-tag v-if="row.is_official" size="small" type="primary">官方</el-tag>
+            <el-tag v-if="row.pinned" size="small" type="warning">置顶</el-tag>
+          </div>
           <div class="body">{{ row.body }}</div>
           <div v-if="row.images.length" class="images">
             <el-image
@@ -140,6 +187,7 @@ onMounted(load)
             <div v-if="row.ai_note" class="muted note">{{ row.ai_note }}</div>
           </template>
           <span v-else class="muted">未预审</span>
+          <div v-if="row.images.length" class="muted note">AI 只看文字，图片请自己检查</div>
         </template>
       </el-table-column>
       <el-table-column label="投稿人（仅管理员可见）" width="170">
@@ -159,7 +207,10 @@ onMounted(load)
           </template>
           <template v-else-if="row.status === 'online'">
             <div class="muted">{{ formatDateTime(row.published_at) }} 上墙</div>
-            <el-button type="danger" size="small" plain class="mt" @click="openReject(row, 'offline')">下架</el-button>
+            <div class="mt">
+              <el-button size="small" :loading="busyId === row.id" @click="togglePin(row)">{{ row.pinned ? '取消置顶' : '置顶' }}</el-button>
+              <el-button type="danger" size="small" plain @click="openReject(row, 'offline')">下架</el-button>
+            </div>
           </template>
           <span v-else-if="row.reject_reason" class="reason">{{ row.reject_reason }}</span>
           <span v-else class="muted">—</span>
@@ -180,6 +231,19 @@ onMounted(load)
       />
     </div>
   </el-card>
+
+  <el-dialog v-model="official.visible" title="发布官方帖" width="520px">
+    <p class="muted hint">官方帖不用审核，发布后立刻出现在墙上，显示为「官方」。适合发规则说明和通知。</p>
+    <el-select v-model="official.tagId" placeholder="选择标签" style="width: 160px; margin-bottom: 10px">
+      <el-option v-for="t in meta.postTags" :key="t.id" :value="t.id" :label="t.name" />
+    </el-select>
+    <el-input v-model="official.body" type="textarea" :rows="6" maxlength="500" show-word-limit placeholder="正文，2–500 字" />
+    <el-checkbox v-model="official.pinned" class="mt">同时置顶</el-checkbox>
+    <template #footer>
+      <el-button @click="official.visible = false">取消</el-button>
+      <el-button type="primary" :loading="official.submitting" @click="submitOfficial">发布</el-button>
+    </template>
+  </el-dialog>
 
   <el-dialog v-model="rejectDialog.visible" :title="DIALOG_TEXT[rejectDialog.mode].title" width="520px">
     <p class="dialog-body">{{ rejectDialog.post?.body }}</p>
@@ -206,6 +270,27 @@ onMounted(load)
 <style scoped>
 .panel {
   border-radius: var(--r);
+}
+.top {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+.tabs {
+  flex: 1;
+  min-width: 0;
+}
+.marks {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+.marks:empty {
+  display: none;
+}
+.hint {
+  margin: 0 0 12px;
+  line-height: 1.6;
 }
 .body {
   color: var(--text-1);

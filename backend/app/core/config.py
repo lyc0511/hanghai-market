@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     DAILY_PUBLISH_LIMIT: int = 10
     WALL_DAILY_POST_LIMIT: int = 5  # 校园墙：每人每天最多投稿条数（撤回的也算，防止反复刷）
     WALL_DAILY_COMMENT_LIMIT: int = 50  # 校园墙：每人每天最多评论条数（删除的也算）
+    WALL_AI_PRESCREEN: bool = True  # 校园墙：投稿后是否让大模型预审（只打标记，不影响投稿；没配 LLM_API_KEY 时自动跳过）
 
     model_config = SettingsConfigDict(
         env_file=BASE_DIR / ".env",

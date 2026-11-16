@@ -41,6 +41,15 @@ def db():
         conn.close()
 
 
+@pytest.fixture(autouse=True)
+def no_real_ai_prescreen(monkeypatch):
+    """投稿后的 AI 预审是后台任务，会真的调用大模型。测试里默认关掉，避免花钱、变慢、结果不稳定；
+    专门测预审的用例（test_wall_admin.py）直接调用 prescreen_post 并使用假的大模型回复。"""
+    from app.api import post_ai
+
+    monkeypatch.setattr(post_ai, "prescreen_in_background", lambda post_id: None)
+
+
 @pytest.fixture()
 def client(db):
     app.dependency_overrides[get_db] = lambda: db

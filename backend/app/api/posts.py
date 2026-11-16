@@ -24,11 +24,12 @@ from datetime import datetime, time, timezone
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, Query
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session, joinedload
 
+from app.api import post_ai
 from app.api.deps import get_current_user, require_admin
 from app.api.notifications import notify
 from app.api.upload import public_url
@@ -39,7 +40,9 @@ from app.db.session import get_db
 from app.models import AuditLog, Category, Content, Post, PostLike, User
 from app.schemas.admin import RejectIn
 from app.schemas.common import ApiResponse, Page, ok
-from app.schemas.post import AdminPostOut, LikeOut, PostAuthor, PostCreateIn, PostOut, PostStatus, PostTag
+from app.schemas.post import (
+    AdminPostOut, LikeOut, OfficialPostIn, PostAuthor, PostCreateIn, PostOut, PostStatus, PostTag, TagCount, WallSummaryOut,
+)
 
 router = APIRouter(prefix="/posts", tags=["校园墙"])
 admin_router = APIRouter(prefix="/admin/posts", tags=["管理后台"])
@@ -133,6 +136,7 @@ def get_tag(db: Session, tag_id: int) -> Category:
 @router.post("", response_model=ApiResponse[PostOut], summary="投稿（提交后待审核）")
 def create_post(
     body: PostCreateIn,
+    background: BackgroundTasks,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> ApiResponse[PostOut]:
@@ -160,6 +164,8 @@ def create_post(
     )
     db.add(content)
     db.commit()
+    # AI 预审放到后台做：接口先返回，不让投稿人等大模型
+    background.add_task(post_ai.prescreen_in_background, content.id)
     return ok(to_out(load_post(db, content.id), user), "投稿成功，审核通过后会通知你")
 
 
@@ -187,7 +193,25 @@ def list_posts(
     return ok(Page(items=to_out_list(db, rows, user), total=total, page=page, page_size=page_size))
 
 
-# 注意：必须写在 /{post_id} 前面，否则 "mine" 会被当成帖子 id 去匹配
+# 注意：/summary 和 /mine 都必须写在 /{post_id} 前面，否则会被当成帖子 id 去匹配
+@router.get("/summary", response_model=ApiResponse[WallSummaryOut], summary="墙的统计数字（游客可见，不含任何帖子内容）")
+def wall_summary(db: Session = Depends(get_db)) -> ApiResponse[WallSummaryOut]:
+    online = (Content.type == "post", Content.status == "online")
+    today_start = datetime.combine(datetime.now(LOCAL_TZ).date(), time.min, tzinfo=LOCAL_TZ)
+    total = db.scalar(select(func.count()).select_from(Content).where(*online)) or 0
+    today = db.scalar(
+        select(func.count()).select_from(Content).join(Post, Post.content_id == Content.id)
+        .where(*online, Post.published_at >= today_start)
+    ) or 0
+    # 每个标签都列出来，没有帖子的显示 0
+    counts = dict(db.execute(select(Content.category_id, func.count()).where(*online).group_by(Content.category_id)).all())
+    tags = db.scalars(select(Category).where(Category.type == "post").order_by(Category.sort_order, Category.id)).all()
+    return ok(WallSummaryOut(
+        today=int(today), total=int(total),
+        tags=[TagCount(name=t.name, slug=t.slug, count=int(counts.get(t.id, 0))) for t in tags],
+    ))
+
+
 @router.get("/mine", response_model=ApiResponse[Page[PostOut]], summary="我的投稿（含待审核、已退回）")
 def list_my_posts(
     status: PostStatus | None = Query(default=None, description="不传返回全部"),
@@ -243,6 +267,7 @@ def lock_own_post(db: Session, post_id: int, user: User) -> Content:
 def update_post(
     post_id: int,
     body: PostCreateIn,
+    background: BackgroundTasks,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> ApiResponse[PostOut]:
@@ -265,6 +290,7 @@ def update_post(
     post.ai_note = None
     db.commit()
     db.expire_all()
+    background.add_task(post_ai.prescreen_in_background, post_id)
     return ok(to_out(load_post(db, post_id), user), "已重新提交，审核通过后会通知你")
 
 
@@ -426,3 +452,54 @@ def take_post_offline(
     ))
     db.commit()
     return ok(reload_for_admin(db, post_id, admin), "已下架")
+
+
+# ---------------------------------------------------------------- 官方帖与置顶
+
+@admin_router.post("", response_model=ApiResponse[AdminPostOut], summary="发布官方帖（不用审核，直接上墙）")
+def create_official_post(
+    body: OfficialPostIn,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> ApiResponse[AdminPostOut]:
+    tag = get_tag(db, body.tag_id)
+    now = now_utc()
+    content = Content(
+        type="post",
+        owner_id=admin.id,
+        title=make_title(body.body),
+        summary=body.body[:300],
+        category_id=tag.id,
+        status="online",
+        search_text=build_search_text(body.body, tag.name),
+        post=Post(body=body.body, images=body.images, is_official=True, published_at=now, pinned_at=now if body.pinned else None),
+    )
+    db.add(content)
+    db.flush()
+    db.add(AuditLog(
+        admin_id=admin.id, action="official_post", target_type="post", target_id=content.id, detail={"pinned": body.pinned}
+    ))
+    db.commit()
+    return ok(reload_for_admin(db, content.id, admin), "已发布")
+
+
+def set_pinned(db: Session, post_id: int, admin: User, pinned: bool) -> AdminPostOut:
+    c = db.scalar(select(Content).where(Content.id == post_id, Content.type == "post").with_for_update())
+    if c is None or c.status == "deleted":
+        raise BizError(40491, "帖子不存在")
+    if c.status != "online":
+        raise BizError(40991, "只有已上墙的帖子可以置顶")
+    db.get(Post, c.id).pinned_at = now_utc() if pinned else None
+    db.add(AuditLog(admin_id=admin.id, action="pin_post" if pinned else "unpin_post", target_type="post", target_id=c.id))
+    db.commit()
+    return reload_for_admin(db, post_id, admin)
+
+
+@admin_router.post("/{post_id}/pin", response_model=ApiResponse[AdminPostOut], summary="置顶帖子")
+def pin_post(post_id: int, admin: User = Depends(require_admin), db: Session = Depends(get_db)) -> ApiResponse[AdminPostOut]:
+    return ok(set_pinned(db, post_id, admin, True), "已置顶")
+
+
+@admin_router.delete("/{post_id}/pin", response_model=ApiResponse[AdminPostOut], summary="取消置顶")
+def unpin_post(post_id: int, admin: User = Depends(require_admin), db: Session = Depends(get_db)) -> ApiResponse[AdminPostOut]:
+    return ok(set_pinned(db, post_id, admin, False), "已取消置顶")
