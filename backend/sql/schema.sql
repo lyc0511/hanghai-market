@@ -191,3 +191,40 @@ CREATE TABLE audit_logs (
   detail JSONB,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- ⑮ 帖子（校园墙，T16）：公共字段在 contents（type='post'），这里是帖子特有的字段
+-- 已在运行的数据库用 sql/upgrade_T16_wall.sql 升级，内容与下面三张表一致
+CREATE TABLE posts (
+  content_id BIGINT PRIMARY KEY REFERENCES contents(id) ON DELETE CASCADE,
+  body TEXT NOT NULL,
+  images TEXT[] NOT NULL DEFAULT '{}',
+  is_official BOOLEAN NOT NULL DEFAULT FALSE,
+  pinned_at TIMESTAMPTZ,
+  resolved_at TIMESTAMPTZ,
+  published_at TIMESTAMPTZ,
+  like_count INT NOT NULL DEFAULT 0,
+  comment_count INT NOT NULL DEFAULT 0,
+  ai_level VARCHAR(16),
+  ai_note VARCHAR(200)
+);
+CREATE INDEX idx_posts_published ON posts(published_at DESC);
+
+-- ⑯ 帖子评论
+CREATE TABLE post_comments (
+  id BIGSERIAL PRIMARY KEY,
+  post_id BIGINT NOT NULL REFERENCES posts(content_id) ON DELETE CASCADE,
+  user_id BIGINT NOT NULL REFERENCES users(id),
+  reply_to_id BIGINT REFERENCES post_comments(id),
+  body VARCHAR(300) NOT NULL,
+  status VARCHAR(16) NOT NULL DEFAULT 'online',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_post_comments_post ON post_comments(post_id, created_at);
+
+-- ⑰ 帖子点赞：一人对一条帖子只能点一次（联合主键保证）
+CREATE TABLE post_likes (
+  post_id BIGINT NOT NULL REFERENCES posts(content_id) ON DELETE CASCADE,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (post_id, user_id)
+);

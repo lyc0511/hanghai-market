@@ -14,7 +14,7 @@ from app.schemas.meta import CategoryOut, EnumsOut
 router = APIRouter(prefix="/meta", tags=["字典"])
 
 ENUMS = EnumsOut(
-    content_type={"item": "物品", "club": "社团", "activity": "活动"},
+    content_type={"item": "物品", "club": "社团", "activity": "活动", "post": "帖子"},
     content_status={
         "pending": "待审核",
         "online": "已上架",
@@ -50,7 +50,9 @@ def get_enums() -> ApiResponse[EnumsOut]:
 
 @router.get("/categories", response_model=ApiResponse[list[CategoryOut]], summary="类目列表")
 def list_categories(
-    type: Literal["item", "club"] | None = Query(default=None, description="item=物品类目，club=社团类目；不传返回全部"),
+    type: Literal["item", "club", "post"] | None = Query(
+        default=None, description="item=物品类目，club=社团类目，post=校园墙标签；不传返回全部"
+    ),
     db: Session = Depends(get_db),
 ) -> ApiResponse[list[CategoryOut]]:
     stmt = select(Category).order_by(Category.type, Category.sort_order, Category.id)

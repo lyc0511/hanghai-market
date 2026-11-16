@@ -14,11 +14,12 @@ if TYPE_CHECKING:
     from app.models.category import Category
     from app.models.club import Club
     from app.models.item import Item
+    from app.models.post import Post
     from app.models.user import User
 
 
 class Content(Base):
-    """统一内容表：物品 / 社团 / 活动 的公共字段，子表按 content_id 一对一扩展。"""
+    """统一内容表：物品 / 社团 / 活动 / 帖子 的公共字段，子表按 content_id 一对一扩展。"""
 
     __tablename__ = "contents"
     __table_args__ = (
@@ -54,3 +55,4 @@ class Content(Base):
     activity: Mapped[Activity | None] = relationship(
         back_populates="content", uselist=False, cascade="all, delete-orphan"
     )
+    post: Mapped[Post | None] = relationship(back_populates="content", uselist=False, cascade="all, delete-orphan")

@@ -1,4 +1,4 @@
-"""ORM 模型统一出口：导入本包即可让 Base.metadata 收集全部 14 张表。"""
+"""ORM 模型统一出口：导入本包即可让 Base.metadata 收集全部 17 张表。"""
 from app.models.activity import Activity
 from app.models.activity_signup import ActivitySignup
 from app.models.ai_message import AiMessage
@@ -11,6 +11,7 @@ from app.models.content import Content
 from app.models.intent import TradeIntent
 from app.models.item import Item
 from app.models.notification import Notification
+from app.models.post import Post, PostComment, PostLike
 from app.models.report import Report
 from app.models.user import User
 
@@ -26,6 +27,9 @@ __all__ = [
     "Content",
     "Item",
     "Notification",
+    "Post",
+    "PostComment",
+    "PostLike",
     "Report",
     "TradeIntent",
     "User",

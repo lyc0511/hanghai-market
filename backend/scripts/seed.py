@@ -46,7 +46,7 @@ PASSWORD = os.environ.get("SEED_PASSWORD") or "Test1234"
 ALL_TABLES = [
     "audit_logs", "ai_messages", "reports", "notifications", "activity_signups",
     "club_applications", "club_members", "trade_intents", "activities", "clubs",
-    "items", "contents", "categories", "users",
+    "items", "post_likes", "post_comments", "posts", "contents", "categories", "users",
 ]
 
 rnd = random.Random(2027)  # 固定随机种子：每次运行结构一致，便于写论文截图
@@ -111,6 +111,11 @@ CLUB_CATEGORIES = [
     ("公益实践", "public"), ("其他", "other"),
 ]
 CLUB_CATEGORIES_MAP = {slug: name for name, slug in CLUB_CATEGORIES}
+# 校园墙标签：与 sql/upgrade_T16_wall.sql 里的保持一致
+POST_TAGS = [
+    ("失物招领", "lost_found"), ("求助", "help"), ("搭子", "buddy"),
+    ("表白", "confession"), ("吐槽", "rant"), ("其他", "other"),
+]
 
 
 def seed_categories(db) -> tuple[dict[str, Category], dict[str, Category]]:
@@ -123,6 +128,8 @@ def seed_categories(db) -> tuple[dict[str, Category], dict[str, Category]]:
         c = Category(type="club", name=name, slug=slug, sort_order=i)
         db.add(c)
         club_cats[slug] = c
+    for i, (name, slug) in enumerate(POST_TAGS, start=1):
+        db.add(Category(type="post", name=name, slug=slug, sort_order=i))
     db.flush()
     return item_cats, club_cats
 
