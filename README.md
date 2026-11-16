@@ -1,6 +1,6 @@
 # 校内二手交易与社团活动一体化平台
 
-本科毕业设计项目，面向本校学生，包含三个板块：二手物品交易、社团目录与招募、社团活动。
+本科毕业设计项目，面向本校学生，包含四个板块：二手物品交易、社团目录与招募、社团活动、校园墙。
 
 当前进度：
 - **T01 工程骨架与数据库**（14 张表、种子数据、FastAPI 骨架、字典接口）
@@ -21,6 +21,8 @@
 - **T12 管理后台扩展**（数据看板：待办 + 平台概况 + 30 天趋势；用户管理：搜索、封禁（可同时下架在售物品）/ 解封；操作日志）
 - **T13 收尾**（首页到港公告混排闲置 / 招新 / 活动；公共查询工具 `app/core/query.py`；pytest 自动化测试 10 个；演示数据时间「保鲜」脚本）
 - **T14 AI 助手「小航」**（右下角悬浮聊天窗，游客也能用；DeepSeek 大模型 + 工具调用，按真实数据找闲置 / 社团 / 活动，按《使用说明》回答功能问题；限流、降级、对话日志）
+- **T15 Docker 部署**（Nginx + FastAPI + PostgreSQL 三个容器；初始化、更新、备份脚本；见 [docs/部署指南.md](docs/部署指南.md)）
+- **T16 校园墙**（匿名投稿 → 管理员审核 → 上墙；AI 预审打标记；图片打码并去除隐藏信息；点赞、评论（楼主匿名）、已解决；举报帖子 / 评论；官方帖与置顶；新增 3 张表，共 17 张）
 
 ## 技术栈
 
@@ -257,7 +259,7 @@ npm run dev
 | GET | `/api/notifications?unread_only=true` | 我的通知（分页，新的在前） |
 | GET | `/api/notifications/unread-count` | 未读数量 |
 | POST | `/api/notifications/{id}/read` · `/api/notifications/read-all` | 标为已读 / 全部已读 |
-| POST | `/api/reports` | 举报物品 / 社团 / 活动（需登录） |
+| POST | `/api/reports` | 举报物品 / 社团 / 活动 / 帖子 / 评论（需登录） |
 | GET | `/api/reports/mine` | 我的举报及处理结果 |
 | GET | `/api/admin/reports?status=pending` | 举报列表（管理员，可按类型筛选） |
 | POST | `/api/admin/reports/{id}/handle` | 处理举报：`resolve`（可 `takedown` 下架）/ `dismiss` |
@@ -265,6 +267,17 @@ npm run dev
 | GET | `/api/admin/users?keyword=` | 用户列表（学号 / 昵称搜索，按状态筛选） |
 | POST | `/api/admin/users/{id}/ban` · `/unban` | 封禁（可同时下架在售物品）/ 解封 |
 | GET | `/api/admin/audit-logs?action=` | 管理操作日志 |
+| GET | `/api/posts/summary` | 墙的统计数字（游客可见，不含内容） |
+| POST | `/api/posts` | 投稿（需登录，提交后待审核） |
+| GET | `/api/posts?tag_id=&keyword=` | 墙：信息流（需登录，只有已上墙的） |
+| GET | `/api/posts/mine` · `/api/posts/{id}` | 我的投稿 / 帖子详情 |
+| PUT · DELETE | `/api/posts/{id}` | 修改后重投（仅待审核 / 已退回）/ 撤回 |
+| POST · DELETE | `/api/posts/{id}/like` · `/resolve` | 点赞 / 取消；标记已解决 / 取消（投稿人） |
+| GET · POST | `/api/posts/{id}/comments` | 评论列表 / 发表评论或回复 |
+| DELETE | `/api/posts/{id}/comments/{comment_id}` | 删除评论（本人）或下架（管理员） |
+| GET · POST | `/api/admin/posts` | 墙审核列表（含真实投稿人、AI 预审）/ 发布官方帖 |
+| POST | `/api/admin/posts/{id}/approve` · `/reject` · `/offline` | 通过 / 退回 / 下架（管理员） |
+| POST · DELETE | `/api/admin/posts/{id}/pin` | 置顶 / 取消置顶（管理员） |
 
 ## 登录与鉴权
 
@@ -445,6 +458,30 @@ frontend/src/
 
 封禁后立即生效：登录被拒（40102），已登录的令牌下一次请求就被拦（`deps.get_current_user` 每次读库判断状态）。解封不会自动重新上架物品。
 
+## 校园墙
+
+投稿墙模式：任何登录用户都能匿名投稿，管理员审核通过后才上墙（先审后发）。入口是导航上的「墙」。
+
+```
+投稿 ──▶ pending ──通过──▶ online（上墙）──管理员下架 / 举报属实──▶ offline
+            └──退回──▶ rejected ──投稿人修改──▶ pending
+投稿人撤回：任意状态 ──▶ deleted（软删除）
+```
+
+- **数据**：帖子是 `contents` 的新类型 `post`，特有字段在 `posts`（正文、图片、AI 标记、点赞数、评论数、置顶、已解决、上墙时间）；评论 `post_comments`、点赞 `post_likes`。标签放在 `categories`（`type='post'`），改名或增减只改数据。
+- **匿名**（最重要）：
+  - 普通接口返回的 `PostOut` 里没有投稿人的任何字段，「是不是我发的」由服务器比较后只返回 `is_mine`；投稿时间也只给本人和管理员，别人只看到上墙时间。
+  - 评论显示昵称，但投稿人在自己帖子下评论时显示为「楼主」，接口和通知里都不带昵称。
+  - 只有 `/api/admin/posts` 返回真实投稿人。看墙必须登录；游客只能拿到 `/api/posts/summary` 的数字。
+- **审核**：已上墙的帖子不能修改，只能撤回（防止先发正常内容过审再改）。被退回的可以修改后重投。
+- **AI 预审**（`app/api/post_ai.py`）：投稿后作为后台任务调用大模型，把「未发现问题 / 需要留意 + 理由」写进 `posts.ai_level / ai_note`，只给管理员参考，不改变状态。失败、超时、格式不对都保持「未预审」。帖子正文放在 `<post>` 标签里当作材料，其中的指令不会被执行。只检查文字，不检查图片。开关 `WALL_AI_PRESCREEN`。
+- **图片**（前端 `lib/image.js`、`ImageMaskDialog.vue`）：选图后在浏览器里缩到 1600 像素以内、转 JPEG，同时去掉 EXIF（拍摄地点等）；可以用马赛克笔刷打码；点提交时才上传，原图不会到服务器。
+- **互动**：点赞（联合主键，一人一次）、评论和回复（先发后审）、投稿人标记「已解决」。评论有每日上限和一份很短的敏感词表（`app/core/banned_words.py`）。
+- **管理**：举报支持帖子和评论（新增理由「泄露隐私」）；管理员可下架帖子和评论、发布官方帖（直接上墙）、置顶。
+- **限制**：每人每天投稿 `WALL_DAILY_POST_LIMIT`（默认 5，撤回的也算）、评论 `WALL_DAILY_COMMENT_LIMIT`（默认 50）。
+
+错误码：40491 帖子不存在 · 42291 标签不存在 · 42991 今日投稿已达上限 · 40391 无权操作该帖子 · 40991 当前状态不能执行此操作 · 40992 当前状态不能审核 · 40492 评论不存在 · 42292 评论含不合适的词语 · 42992 今日评论已达上限 · 40392 无权操作该评论。
+
 ## 部署上线
 
 服务器上用 Docker Compose 运行三个容器（Nginx 前端、FastAPI 后端、PostgreSQL），一键初始化、更新、备份脚本在 `deploy/`。完整步骤见 [docs/部署指南.md](docs/部署指南.md)。本地开发方式不变。
@@ -484,6 +521,9 @@ uv pip install --python .venv\Scripts\python.exe -r requirements-dev.txt   # 本
 - `tests/test_flows.py`：登录鉴权、发布 → 审核、交易意向完整流转、举报规则与下架、通知归属、封禁 / 解封（8 个）
 - `tests/test_concurrency.py`：最后一个名额多人同时报名只有 1 人成功；行锁确定性测试（去掉 `with_for_update` 时该测试会失败）
 - `tests/test_assistant.py`：AI 助手（用假的大模型，不花钱）：工具调用只返回已上架内容、模型乱填参数不崩溃、工具轮数上限、降级、校验与限流、提示词缓存结构；个人工具只给登录用户、只查自己、不泄露微信号；草稿按发布规则校验、不写库、受每日上限约束；全站每日调用上限（16 个）
+- `tests/test_wall.py`：校园墙先审后发、匿名不泄露、帖子不混进物品列表、越权、每日上限、筛选排序（9 个）
+- `tests/test_wall_interact.py`：点赞幂等、楼主在评论和通知里保持匿名、评论规则、删除与下架、已解决、举报帖子和评论（9 个）
+- `tests/test_wall_admin.py`：AI 预审（假的大模型）的写入、容错、提示注入处理、并发修改；官方帖、置顶、游客统计（9 个）
 - 隔离：每个测试在一个事务里运行，结束整体回滚，**不会改动演示数据**；并发测试需要真实提交，自己造临时数据并在结束时删除
 
 ## 演示数据「保鲜」
