@@ -6,7 +6,7 @@
 令牌缺失或失效时返回 HTTP 401（code 40100），由 deps.get_current_user 抛出。
 """
 from fastapi import APIRouter, Depends
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -29,7 +29,7 @@ def user_out(user: User) -> UserOut:
 
 
 def _token_for(user: User) -> TokenOut:
-    token, expires_in = create_access_token(user.id)
+    token, expires_in = create_access_token(user.id, user.password_hash)
     return TokenOut(access_token=token, expires_in=expires_in, user=user_out(user))
 
 
@@ -98,6 +98,12 @@ def change_password(
 ) -> ApiResponse[None]:
     if not verify_password(body.old_password, user.password_hash):
         raise BizError(40103, "原密码错误")
-    user.password_hash = hash_password(body.new_password)
+    if body.old_password == body.new_password:
+        raise BizError(42200, "新密码不能与原密码相同")
+    # 仅在密码仍是刚才核验的版本时更新，避免两个并发修改互相覆盖。
+    changed_id = db.scalar(update(User).where(User.id == user.id, User.password_hash == user.password_hash)
+                           .values(password_hash=hash_password(body.new_password)).returning(User.id))
+    if changed_id is None:
+        raise BizError(40103, "密码已变更，请重新登录")
     db.commit()
     return ok(None, "密码已修改")

@@ -33,6 +33,25 @@ def test_me_and_admin_guard(client, make_user):
     assert call(client, "GET", "/admin/dashboard", h)["code"] == 40300
 
 
+def test_password_change_revokes_both_sessions(client, make_user):
+    _, unrelated = make_user()
+    credentials = {"student_no": "29963333", "password": "FirstPass123"}
+    first = call(client, "POST", "/auth/register", json={**credentials, "nickname": "改密测试"})
+    second = call(client, "POST", "/auth/login", json=credentials)
+    sessions = [{"Authorization": "Bearer " + r["data"]["access_token"]} for r in (first, second)]
+    assert sessions[0] != sessions[1]
+    change = {"old_password": credentials["password"], "new_password": "SecondPass123"}
+    assert call(client, "POST", "/auth/password", sessions[0], json={**change, "old_password": "Wrong1234"})["code"] == 40103
+    assert call(client, "GET", "/auth/me", sessions[1])["code"] == 0
+    assert call(client, "POST", "/auth/password", sessions[0], json=change)["code"] == 0
+    for headers in sessions:
+        assert call(client, "GET", "/auth/me", headers)["code"] == 40100
+    assert call(client, "GET", "/auth/me", unrelated)["code"] == 0
+    assert call(client, "POST", "/auth/login", json=credentials)["code"] == 40101
+    fresh = call(client, "POST", "/auth/login", json={**credentials, "password": change["new_password"]})
+    assert call(client, "GET", "/auth/me", {"Authorization": "Bearer " + fresh["data"]["access_token"]})["code"] == 0
+
+
 # ------------------------------------------------------------ 发布 → 审核
 
 def test_publish_then_admin_approve(client, db, make_user, item_category_id):

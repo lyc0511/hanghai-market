@@ -37,7 +37,7 @@ def test_last_seat_only_one_wins():
                         location="测试教室", capacity=1))
         db.commit()
 
-        tokens = [create_access_token(uid)[0] for uid in user_ids]
+        tokens = [create_access_token(u.id, u.password_hash)[0] for u in users]
         barrier = threading.Barrier(N)
         codes: list[int] = []
         lock = threading.Lock()
@@ -107,7 +107,7 @@ def test_signup_waits_for_row_lock():
         holder.flush()
 
         result: dict = {}
-        token = create_access_token(user_ids[1])[0]
+        token = create_access_token(users[1].id, users[1].password_hash)[0]
 
         def b_signup() -> None:
             r = TestClient(app).post(f"/api/activities/{activity_id}/signup", headers={"Authorization": f"Bearer {token}"})

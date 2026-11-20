@@ -75,7 +75,9 @@ def load_intent(db: Session, intent_id: int) -> TradeIntent | None:
 
 
 def lock_intent(db: Session, intent_id: int, user: User, role: Literal["buyer", "seller"], allowed: tuple[str, ...]) -> TradeIntent:
-    """加行锁取出意向，并检查操作人身份和当前状态。"""
+    """先锁所属物品，再读取并锁定意向，与下架和批量关闭操作顺序一致。"""
+    item_id = select(TradeIntent.item_id).where(TradeIntent.id == intent_id).scalar_subquery()
+    db.scalar(select(Content.id).where(Content.id == item_id).with_for_update())
     t = db.scalar(select(TradeIntent).where(TradeIntent.id == intent_id).with_for_update())
     if t is None:
         raise BizError(40402, "意向不存在")
@@ -98,7 +100,7 @@ def create_intent(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> ApiResponse[IntentOut]:
-    content = db.scalar(select(Content).where(Content.id == body.item_id, Content.type == "item"))
+    content = db.scalar(select(Content).where(Content.id == body.item_id, Content.type == "item").with_for_update())
     if content is None or content.status != "online":
         raise BizError(42204, "物品不存在或已下架")
     if content.owner_id == user.id:
@@ -206,8 +208,7 @@ def cancel_intent(intent_id: int, user: User = Depends(get_current_user), db: Se
 @router.post("/{intent_id}/complete", response_model=ApiResponse[IntentOut], summary="标记成交（卖家），物品自动下架")
 def complete_intent(intent_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> ApiResponse[IntentOut]:
     t = lock_intent(db, intent_id, user, "seller", ("accepted",))
-    # 先锁物品：同一件物品的两个意向被同时标记成交时，只有先拿到锁的那个能成功
-    content = db.scalar(select(Content).where(Content.id == t.item_id).with_for_update())
+    content = db.get(Content, t.item_id)
     if content.status != "online":
         raise BizError(42204, "物品已下架或已售出")
     now = datetime.now(timezone.utc)

@@ -74,7 +74,7 @@ def make_user(db):
         )
         db.add(u)
         db.flush()
-        token, _ = create_access_token(u.id)
+        token, _ = create_access_token(u.id, u.password_hash)
         return u, {"Authorization": f"Bearer {token}"}
 
     return _make

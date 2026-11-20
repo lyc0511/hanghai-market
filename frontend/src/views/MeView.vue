@@ -10,6 +10,7 @@ import PageHeader from '@/components/PageHeader.vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { confirm } from '@/composables/confirm'
 import { useUserStore } from '@/stores/user'
@@ -47,6 +48,29 @@ async function saveWechat() {
     /* 格式错误等提示已由 http.js 弹出 */
   } finally {
     saving.value = false
+  }
+}
+
+const passwordOpen = ref(false)
+const passwordSaving = ref(false)
+
+async function savePassword(event) {
+  if (passwordSaving.value) return
+  const form = event.currentTarget
+  const fields = new FormData(form)
+  if (fields.get('new_password') !== fields.get('confirm_password')) return toast.error('两次输入的新密码不一致')
+  passwordSaving.value = true
+  try {
+    await authApi.changePassword({ old_password: fields.get('old_password'), new_password: fields.get('new_password') })
+    form.reset()
+    passwordOpen.value = false
+    user.logout()
+    toast.success('密码已修改，请用新密码重新登录')
+    await router.replace({ name: 'login' })
+  } catch {
+    /* 请求失败由统一拦截器提示 */
+  } finally {
+    passwordSaving.value = false
   }
 }
 
@@ -102,7 +126,26 @@ async function onLogout() {
       </router-link>
     </nav>
 
+    <Button variant="outline" class="mt-6" @click="passwordOpen = true">修改密码</Button>
     <Button variant="ghost" class="mt-6 text-muted-foreground" @click="onLogout"><LogOut />退出登录</Button>
+
+    <Dialog v-model:open="passwordOpen">
+      <DialogContent class="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>修改密码</DialogTitle>
+          <DialogDescription>保存后，所有设备都需要重新登录。</DialogDescription>
+        </DialogHeader>
+        <form class="space-y-3" @submit.prevent="savePassword">
+          <Label for="old-password">当前密码</Label>
+          <Input id="old-password" name="old_password" type="password" autocomplete="current-password" required />
+          <Label for="new-password">新密码（8–32 位，含字母和数字）</Label>
+          <Input id="new-password" name="new_password" type="password" autocomplete="new-password" minlength="8" maxlength="32" required />
+          <Label for="confirm-password">确认新密码</Label>
+          <Input id="confirm-password" name="confirm_password" type="password" autocomplete="new-password" maxlength="32" required />
+          <DialogFooter><Button type="submit" :disabled="passwordSaving">保存新密码</Button></DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
 
     <Dialog v-model:open="wechatOpen">
       <DialogContent class="sm:max-w-sm">

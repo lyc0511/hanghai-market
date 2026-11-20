@@ -8,6 +8,7 @@ export const authApi = {
   login: (studentNo, password) => http.post('/auth/login', { student_no: studentNo, password }),
   register: (body) => http.post('/auth/register', body),
   me: () => http.get('/auth/me'),
+  changePassword: (body) => http.post('/auth/password', body),
   updateMe: (body) => http.patch('/auth/me', body),
 }
 
