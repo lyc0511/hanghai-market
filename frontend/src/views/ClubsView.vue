@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from 'motion-v'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 
 import { clubApi } from '@/api'
+import SectionBanner from '@/components/SectionBanner.vue'
 import SignalFlag from '@/components/SignalFlag.vue'
 import { Input } from '@/components/ui/input'
 import {
@@ -83,10 +84,13 @@ onMounted(() => {
 
 <template>
   <div class="container">
-    <h1 class="font-display text-4xl text-ocean">社团目录</h1>
-    <p class="mt-1 text-sm text-muted-foreground">共 {{ total }} 个社团，名字前有橙色信号旗的正在招新</p>
+    <SectionBanner
+      eyebrow="社团码头"
+      title="社团目录"
+      :description="`共 ${total} 个社团，名字前挂有橙色信号旗的正在招新`"
+    />
 
-    <div class="mt-6 flex flex-wrap items-center justify-between gap-3 border-y py-3">
+    <div class="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-white p-3.5">
       <div class="flex flex-wrap gap-1.5" role="radiogroup" aria-label="社团类型">
         <button
           v-for="c in [{ code: 'all', name: '全部' }, ...typeOptions.map(([code, name]) => ({ code, name }))]"

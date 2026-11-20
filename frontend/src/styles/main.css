@@ -1,6 +1,4 @@
 
-@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap');
-
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn-vue/tailwind.css";
@@ -134,11 +132,8 @@
     }
 }
 
-@layer base {
-  * {
-    @apply border-border outline-ring/50;
-    }
-  body {
-    @apply bg-background text-foreground;
-    }
+/* 极轻的海图点阵底纹，用于首页与板块页头增加港口辨识度，不干扰文字阅读 */
+.harbor-grid {
+    background-image: radial-gradient(rgba(14, 42, 71, 0.08) 1px, transparent 1px);
+    background-size: 18px 18px;
 }

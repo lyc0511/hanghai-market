@@ -147,7 +147,7 @@ function reset() {
   <!-- 悬浮按钮 -->
   <button
     type="button"
-    class="fixed bottom-5 right-5 z-40 flex h-12 items-center gap-2 rounded-full bg-signal pl-4 pr-5 text-sm font-medium text-white shadow-lg shadow-signal/25 transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal focus-visible:ring-offset-2"
+    class="fixed bottom-20 right-4 z-40 flex h-11 items-center gap-2 rounded-full bg-signal pl-3.5 pr-4 text-sm font-medium text-white shadow-lg shadow-signal/25 transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal focus-visible:ring-offset-2 md:bottom-5 md:right-5 md:h-12 md:pl-4 md:pr-5"
     :class="open ? 'max-sm:hidden' : ''"
     :aria-expanded="open"
     aria-controls="assistant-panel"

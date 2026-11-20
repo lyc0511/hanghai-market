@@ -10,6 +10,7 @@ import { useRouter } from 'vue-router'
 
 import { postApi } from '@/api'
 import PostCard from '@/components/PostCard.vue'
+import SectionBanner from '@/components/SectionBanner.vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -100,13 +101,15 @@ onMounted(() => {
 
 <template>
   <div class="container narrow">
-    <div class="flex items-end justify-between gap-4">
-      <div>
-        <h1 class="font-display text-4xl text-ocean">墙</h1>
-        <p class="mt-1 text-sm text-muted-foreground">匿名投稿，审核后上墙。失物、求助、找搭子、想说的话，都可以发。</p>
-      </div>
-      <Button v-if="user.isLoggedIn" class="shrink-0" @click="router.push({ name: 'wall-new' })"><PenLine />投稿</Button>
-    </div>
+    <SectionBanner
+      eyebrow="匿名广场"
+      title="校园墙"
+      description="匿名投稿，审核后上墙。失物招领、求助、找搭子、想说的话，都可以发。"
+    >
+      <template v-if="user.isLoggedIn" #actions>
+        <Button class="shrink-0" @click="router.push({ name: 'wall-new' })"><PenLine />匿名投稿</Button>
+      </template>
+    </SectionBanner>
 
     <!-- 游客：看不到内容 -->
     <div v-if="!user.isLoggedIn" class="mt-8 rounded-2xl border bg-white px-6 py-14 text-center">
@@ -137,39 +140,41 @@ onMounted(() => {
     </div>
 
     <template v-else>
-      <!-- 标签：横向一排，手机上可以左右滑动 -->
-      <div
-        class="-mx-4 mt-6 flex gap-1.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:px-0 [&::-webkit-scrollbar]:hidden"
-        role="radiogroup"
-        aria-label="标签"
-      >
-        <button
-          v-for="t in [{ id: 0, name: '全部' }, ...meta.postTags]"
-          :key="t.id"
-          type="button"
-          role="radio"
-          :aria-checked="tagId === t.id"
-          class="shrink-0 rounded-full px-3.5 py-1.5 text-sm transition-colors"
-          :class="tagId === t.id ? 'bg-ocean text-white' : 'bg-white text-muted-foreground hover:text-ocean'"
-          @click="tagId = t.id"
+      <div class="mt-5 space-y-3 rounded-2xl border bg-white p-3.5">
+        <!-- 标签：横向一排，手机上可以左右滑动 -->
+        <div
+          class="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:px-0 [&::-webkit-scrollbar]:hidden"
+          role="radiogroup"
+          aria-label="标签"
         >
-          {{ t.name }}
-        </button>
-      </div>
+          <button
+            v-for="t in [{ id: 0, name: '全部' }, ...meta.postTags]"
+            :key="t.id"
+            type="button"
+            role="radio"
+            :aria-checked="tagId === t.id"
+            class="shrink-0 rounded-full px-3.5 py-1.5 text-sm transition-colors"
+            :class="tagId === t.id ? 'bg-ocean text-white' : 'bg-sail text-muted-foreground hover:bg-secondary hover:text-ocean'"
+            @click="tagId = t.id"
+          >
+            {{ t.name }}
+          </button>
+        </div>
 
-      <form class="relative mt-3" role="search" @submit.prevent="onSearch">
-        <Search class="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input v-model="keywordInput" placeholder="搜一搜，比如：校园卡、羽毛球" class="h-10 rounded-full bg-white pl-10 pr-10" aria-label="搜索帖子" />
-        <button
-          v-if="keywordInput"
-          type="button"
-          class="absolute right-2 top-1/2 grid size-7 -translate-y-1/2 place-items-center rounded-full text-muted-foreground hover:bg-secondary"
-          aria-label="清除搜索"
-          @click="clearSearch"
-        >
-          <X class="size-4" />
-        </button>
-      </form>
+        <form class="relative" role="search" @submit.prevent="onSearch">
+          <Search class="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input v-model="keywordInput" placeholder="搜一搜，比如：校园卡、羽毛球" class="h-10 rounded-full bg-sail pl-10 pr-10" aria-label="搜索帖子" />
+          <button
+            v-if="keywordInput"
+            type="button"
+            class="absolute right-2 top-1/2 grid size-7 -translate-y-1/2 place-items-center rounded-full text-muted-foreground hover:bg-secondary"
+            aria-label="清除搜索"
+            @click="clearSearch"
+          >
+            <X class="size-4" />
+          </button>
+        </form>
+      </div>
 
       <div class="mt-5 min-h-80 space-y-3">
         <template v-if="loading && !posts.length">

@@ -5,6 +5,7 @@ import { onMounted, reactive, ref, watch } from 'vue'
 
 import { activityApi } from '@/api'
 import ActivityTable from '@/components/ActivityTable.vue'
+import SectionBanner from '@/components/SectionBanner.vue'
 import { Input } from '@/components/ui/input'
 import {
   Pagination,
@@ -64,10 +65,13 @@ onMounted(() => {
 
 <template>
   <div class="container">
-    <h1 class="font-display text-4xl text-ocean">活动航班表</h1>
-    <p class="mt-1 text-sm text-muted-foreground">全校同学都可以报名社团活动，名额先到先得。</p>
+    <SectionBanner
+      eyebrow="活动航线"
+      title="活动航班表"
+      description="全校同学都可以报名社团活动，名额先到先得，开始前可随时取消。"
+    />
 
-    <div class="mt-6 flex flex-wrap items-center justify-between gap-3 border-y py-3">
+    <div class="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-white p-3.5">
       <Tabs v-model="filters.when">
         <TabsList>
           <TabsTrigger value="upcoming">即将开始</TabsTrigger>

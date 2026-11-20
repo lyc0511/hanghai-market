@@ -1,10 +1,28 @@
 <!--
-  全站顶部导航：左侧 logo + 板块导航，中间搜索，右上角登录 / 用户菜单。
-  手机宽度下，导航和搜索收进左侧抽屉菜单。
+  全站顶部导航：左侧港口标识 + 带图标的主导航，内页提供快捷搜索，右上角统一发布入口、通知与用户菜单。
+  手机端主导航由 SiteLayout 底部栏承载，顶部保持轻盈不拥挤。
 -->
 <script setup>
-import { Bell, ChevronDown, LogOut, Menu, Package, PenLine, Plus, Search, Settings, ShoppingBag, User, Users } from '@lucide/vue'
-import { ref, watch } from 'vue'
+import {
+  Bell,
+  Calendar,
+  CalendarCheck,
+  ChevronDown,
+  Compass,
+  Flag,
+  Home,
+  LogOut,
+  MessageSquare,
+  Package,
+  PenLine,
+  Plus,
+  Search,
+  Settings,
+  ShoppingBag,
+  User,
+  Users,
+} from '@lucide/vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import LoginForm from '@/components/LoginForm.vue'
@@ -19,7 +37,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
-import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { useNotificationStore } from '@/stores/notifications'
 import { useUserStore } from '@/stores/user'
 
@@ -40,29 +57,28 @@ watch(
 )
 
 const NAV = [
-  { to: '/', label: '首页', exact: true },
-  { to: '/market', label: '二手' },
-  { to: '/clubs', label: '社团' },
-  { to: '/activities', label: '活动' },
-  { to: '/wall', label: '墙' },
+  { to: '/', label: '首页', icon: Home, exact: true },
+  { to: '/market', label: '二手市场', icon: ShoppingBag },
+  { to: '/clubs', label: '社团', icon: Users },
+  { to: '/activities', label: '活动', icon: Calendar },
+  { to: '/wall', label: '校园墙', icon: MessageSquare },
 ]
 
 const keyword = ref('')
-const drawer = ref(false)
+// 首页首屏已有大搜索框，顶部不再重复显示
+const showTopSearch = computed(() => route.name !== 'home')
 
 function isActive(n) {
   return n.exact ? route.path === n.to : route.path.startsWith(n.to)
 }
 
 function onSearch() {
-  drawer.value = false
   const k = keyword.value.trim()
   router.push({ name: 'market', query: k ? { keyword: k } : {} })
 }
 
-function onPublish() {
-  drawer.value = false
-  if (user.isLoggedIn) router.push({ name: 'publish' })
+function goAuthRoute(name) {
+  if (user.isLoggedIn) router.push({ name })
   else user.openLogin()
 }
 
@@ -77,35 +93,53 @@ function logout() {
 </script>
 
 <template>
-  <header class="sticky top-0 z-40 border-b bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/75">
-    <div class="container flex h-16 items-center gap-6">
-      <Button variant="ghost" size="icon" class="-ml-2 md:hidden" aria-label="打开菜单" @click="drawer = true">
-        <Menu class="size-5" />
-      </Button>
-
-      <router-link to="/" class="shrink-0 font-display text-2xl tracking-wide text-ocean">航海集市</router-link>
+  <header class="sticky top-0 z-40 border-b bg-white/92 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+    <div class="container flex h-16 items-center gap-4">
+      <router-link to="/" class="group flex shrink-0 items-center gap-2.5">
+        <span class="grid size-8 place-items-center rounded-lg bg-ocean text-white transition-transform group-hover:rotate-12">
+          <Compass class="size-4.5" />
+        </span>
+        <span class="font-display text-2xl tracking-wide text-ocean">航海集市</span>
+      </router-link>
 
       <nav class="hidden items-center gap-1 md:flex" aria-label="主导航">
         <router-link
           v-for="n in NAV"
           :key="n.to"
           :to="n.to"
-          class="relative px-3 py-2 text-[15px] transition-colors"
-          :class="isActive(n) ? 'font-semibold text-ocean' : 'text-muted-foreground hover:text-ocean'"
+          class="relative flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm transition-colors"
+          :class="isActive(n) ? 'bg-ocean/[0.07] font-semibold text-ocean' : 'text-muted-foreground hover:bg-muted/70 hover:text-ocean'"
         >
-          {{ n.label }}
-          <!-- 当前板块：浮标橙下划线 -->
-          <span v-if="isActive(n)" class="absolute inset-x-3 -bottom-[13px] h-0.5 rounded-full bg-buoy" />
+          <component :is="n.icon" class="size-4" :class="isActive(n) ? 'text-buoy' : 'opacity-75'" />
+          <span>{{ n.label }}</span>
+          <span v-if="isActive(n)" class="absolute inset-x-3 -bottom-[11px] h-0.5 rounded-full bg-buoy" />
         </router-link>
       </nav>
 
-      <form class="relative ml-auto hidden w-64 lg:block" role="search" @submit.prevent="onSearch">
+      <form v-if="showTopSearch" class="relative ml-auto hidden w-56 xl:block" role="search" @submit.prevent="onSearch">
         <Search class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input v-model="keyword" placeholder="搜闲置物品" class="h-9 rounded-full bg-sail pl-9" aria-label="搜索闲置物品" />
+        <Input v-model="keyword" placeholder="搜闲置物品" class="h-9 rounded-full bg-sail pl-9 text-sm" aria-label="搜索闲置物品" />
       </form>
 
-      <div class="ml-auto flex items-center gap-2 lg:ml-0">
-        <Button class="hidden md:inline-flex" @click="onPublish"><Plus />发布闲置</Button>
+      <div class="ml-auto flex items-center gap-2" :class="showTopSearch ? 'xl:ml-0' : ''">
+        <!-- 统一发布入口：二手闲置 + 校园墙投稿 -->
+        <DropdownMenu>
+          <DropdownMenuTrigger as-child>
+            <Button size="sm" class="gap-1.5 rounded-full px-3.5">
+              <Plus class="size-4" />
+              <span>发布</span>
+              <ChevronDown class="size-3.5 opacity-80" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" class="w-44">
+            <DropdownMenuItem @select="goAuthRoute('publish')">
+              <Package />发布二手闲置
+            </DropdownMenuItem>
+            <DropdownMenuItem @select="goAuthRoute('wall-new')">
+              <PenLine />校园墙匿名投稿
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         <router-link
           v-if="user.isLoggedIn"
@@ -125,7 +159,7 @@ function logout() {
         <DropdownMenu v-if="user.isLoggedIn">
           <DropdownMenuTrigger as-child>
             <button type="button" class="flex items-center gap-2 rounded-full py-1 pl-1 pr-2 transition-colors hover:bg-muted">
-              <span class="grid size-8 place-items-center rounded-full bg-ocean font-semibold text-white">
+              <span class="grid size-8 place-items-center rounded-full bg-ocean text-sm font-semibold text-white">
                 {{ user.profile?.nickname?.slice(0, 1) ?? '我' }}
               </span>
               <span class="hidden max-w-24 truncate text-sm sm:inline">{{ user.profile?.nickname }}</span>
@@ -140,9 +174,11 @@ function logout() {
             <DropdownMenuSeparator />
             <DropdownMenuItem @select="go('me')"><User />个人中心</DropdownMenuItem>
             <DropdownMenuItem @select="go('my-items')"><Package />我发布的</DropdownMenuItem>
-            <DropdownMenuItem @select="go('my-posts')"><PenLine />我的投稿</DropdownMenuItem>
-            <DropdownMenuItem @select="go('my-clubs')"><Users />我的社团</DropdownMenuItem>
             <DropdownMenuItem @select="go('my-intents')"><ShoppingBag />我的意向</DropdownMenuItem>
+            <DropdownMenuItem @select="go('my-clubs')"><Users />我的社团</DropdownMenuItem>
+            <DropdownMenuItem @select="go('my-activities')"><CalendarCheck />我报名的活动</DropdownMenuItem>
+            <DropdownMenuItem @select="go('my-posts')"><PenLine />我的投稿</DropdownMenuItem>
+            <DropdownMenuItem @select="go('my-reports')"><Flag />我的举报</DropdownMenuItem>
             <DropdownMenuItem @select="go('notifications')"><Bell />消息通知</DropdownMenuItem>
             <template v-if="user.isAdmin">
               <DropdownMenuSeparator />
@@ -154,36 +190,12 @@ function logout() {
         </DropdownMenu>
 
         <template v-else>
-          <Button variant="ghost" class="hidden sm:inline-flex" @click="user.openLogin('register')">注册</Button>
-          <Button variant="outline" @click="user.openLogin('login')">登录</Button>
+          <Button variant="ghost" size="sm" class="hidden sm:inline-flex" @click="user.openLogin('register')">注册</Button>
+          <Button variant="outline" size="sm" @click="user.openLogin('login')">登录</Button>
         </template>
       </div>
     </div>
   </header>
-
-  <!-- 手机端：抽屉菜单 -->
-  <Sheet v-model:open="drawer">
-    <SheetContent side="left" class="w-72 p-6">
-      <SheetTitle class="font-display text-2xl font-normal text-ocean">航海集市</SheetTitle>
-      <form class="relative mt-6" role="search" @submit.prevent="onSearch">
-        <Search class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input v-model="keyword" placeholder="搜闲置物品" class="h-10 rounded-full pl-9" />
-      </form>
-      <nav class="mt-4 flex flex-col">
-        <router-link
-          v-for="n in NAV"
-          :key="n.to"
-          :to="n.to"
-          class="rounded-lg px-3 py-2.5 text-base"
-          :class="isActive(n) ? 'bg-secondary font-semibold text-ocean' : 'text-muted-foreground'"
-          @click="drawer = false"
-        >
-          {{ n.label }}
-        </router-link>
-      </nav>
-      <Button class="mt-4 w-full" @click="onPublish"><Plus />发布闲置</Button>
-    </SheetContent>
-  </Sheet>
 
   <!-- 右上角登录弹窗：任何页面调用 user.openLogin() 都会打开它 -->
   <Dialog v-model:open="user.loginVisible">

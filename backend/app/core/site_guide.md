@@ -12,10 +12,11 @@
 - 社团目录 [/clubs](/clubs)：可筛选「正在招新」
 - 活动 [/activities](/activities)：即将开始 / 已结束
 - 发布闲置 [/publish](/publish)（需登录）
-- 个人中心 [/me](/me)：设置微信号，以及下面这些入口
+- 个人中心 [/me](/me)：修改个人资料、设置微信号、修改密码，以及下面这些入口
   - 我发布的 [/me/items](/me/items)
   - 我想要的（我作为买家发起的意向） [/me/intents?role=buyer](/me/intents?role=buyer)
   - 找我买的（别人对我物品的意向） [/me/intents?role=seller](/me/intents?role=seller)
+  - 我的投稿 [/me/posts](/me/posts)
   - 我的社团 [/me/clubs](/me/clubs)
   - 我报名的活动 [/me/activities](/me/activities)
   - 消息通知 [/notifications](/notifications)（右上角铃铛也能进）

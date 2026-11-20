@@ -22,7 +22,8 @@
 - **T13 收尾**（首页到港公告混排闲置 / 招新 / 活动；公共查询工具 `app/core/query.py`；pytest 自动化测试 10 个；演示数据时间「保鲜」脚本）
 - **T14 AI 助手「小航」**（右下角悬浮聊天窗，游客也能用；DeepSeek 大模型 + 工具调用，按真实数据找闲置 / 社团 / 活动，按《使用说明》回答功能问题；限流、降级、对话日志）
 - **T15 Docker 部署**（Nginx + FastAPI + PostgreSQL 三个容器；初始化、更新、备份脚本；见 [docs/部署指南.md](docs/部署指南.md)）
-- **T16 校园墙**（匿名投稿 → 管理员审核 → 上墙；AI 预审打标记；图片打码并去除隐藏信息；点赞、评论（楼主匿名）、已解决；举报帖子 / 评论；官方帖与置顶；新增 3 张表，共 17 张）
+- **T16 校园墙**（匿名投稿 → 管理员审核 → 上墙；AI 预审打标记；图片打码并去除隐藏信息；点赞、评论（楼主匿名）、已解决；举报帖子 / 评论；官方帖支持配图与置顶；新增 3 张表，共 17 张）
+- **T17 账号安全与并发加固**（管理员核实身份后重置学生密码生成临时密码、首次登录强制改密 `/change-password`；改密 / 重置后通过 JWT `ver` 摘要令旧令牌立即失效；修复交易并发加锁顺序并新增并发测试）
 
 ## 技术栈
 
@@ -44,15 +45,16 @@ campus-platform/
     ├── requirements.txt
     ├── .env.example / .env      # 配置（.env 不入库）
     ├── run.py                   # python run.py 启动开发服务器
-    ├── sql/schema.sql           # 建表脚本（14 张表）
-    ├── scripts/seed.py          # 幂等种子数据
+    ├── sql/                     # 建表脚本 schema.sql（17 张表）与幂等升级脚本 upgrade_*.sql
+    ├── scripts/                 # seed.py、refresh_demo_dates.py、encrypt_wechat.py 等
+    ├── tests/                   # pytest 自动化测试（59 个用例）
     └── app/
         ├── main.py              # FastAPI 入口
-        ├── core/                # 配置、密码哈希、异常处理
+        ├── core/                # 配置、密码哈希、AES-GCM 加密、大模型封装、异常处理
         ├── db/                  # 声明基类、Session
-        ├── models/              # 14 个 ORM 模型
-        ├── schemas/             # Pydantic 模型
-        └── api/                 # 路由（meta 字典、auth 认证、upload 上传、items 物品、intents 交易意向、clubs 社团、admin 管理后台；deps.py 放登录依赖）
+        ├── models/              # 15 个 ORM 模型文件（对应 17 张表）
+        ├── schemas/             # Pydantic 请求 / 响应模型
+        └── api/                 # 路由模块（meta、auth、upload、items、intents、clubs、activities、posts、post_comments、notifications、reports、assistant、admin、admin_system；deps.py 放登录依赖）
 ```
 
 ## 快速开始（Windows PowerShell）
@@ -266,6 +268,7 @@ npm run dev
 | GET | `/api/admin/dashboard?days=30` | 数据看板：待办、概况、每日新增趋势（北京时间） |
 | GET | `/api/admin/users?keyword=` | 用户列表（学号 / 昵称搜索，按状态筛选） |
 | POST | `/api/admin/users/{id}/ban` · `/unban` | 封禁（可同时下架在售物品）/ 解封 |
+| POST | `/api/admin/users/{id}/reset-password` | 核实身份后重置学生密码，返回一次性临时密码并要求首次登录改密 |
 | GET | `/api/admin/audit-logs?action=` | 管理操作日志 |
 | GET | `/api/posts/summary` | 墙的统计数字（游客可见，不含内容） |
 | POST | `/api/posts` | 投稿（需登录，提交后待审核） |
@@ -290,7 +293,7 @@ npm run dev
 }}
 ```
 
-之后请求需要登录的接口时带上请求头 `Authorization: Bearer <access_token>`。令牌有效期由 `.env` 的 `JWT_EXPIRE_HOURS` 控制（默认 24 小时），令牌里只存用户 id，角色和封禁状态每次请求从数据库读取，所以封号立即生效。
+之后请求需要登录的接口时带上请求头 `Authorization: Bearer <access_token>`。令牌有效期由 `.env` 的 `JWT_EXPIRE_HOURS` 控制（默认 24 小时），令牌里存用户 id 与基于当前密码哈希计算的 HMAC 版本标记 `ver`（`session_stamp`）；角色、封禁状态与 `must_change_password` 每次请求从数据库读取，因此封号、修改密码或管理员重置密码后旧令牌都会立即失效。被重置密码的账号登录后仅允许访问 `/api/auth/me` 与 `/api/auth/password`，完成改密后方可正常使用。
 
 在 `/docs` 中调试：先调用登录接口复制 `access_token`，点右上角 **Authorize** 粘贴进去即可。
 
@@ -518,13 +521,15 @@ uv pip install --python .venv\Scripts\python.exe -r requirements-dev.txt   # 本
 .venv\Scripts\python -m pytest
 ```
 
-- `tests/test_flows.py`：登录鉴权、发布 → 审核、交易意向完整流转、举报规则与下架、通知归属、封禁 / 解封（8 个）
-- `tests/test_concurrency.py`：最后一个名额多人同时报名只有 1 人成功；行锁确定性测试（去掉 `with_for_update` 时该测试会失败）
+- `tests/test_flows.py`：登录鉴权、改密后旧令牌失效、发布 → 审核、交易意向完整流转、举报规则与下架、通知归属、封禁 / 解封（9 个）
+- `tests/test_concurrency.py`：最后一个名额多人同时报名只有 1 人成功；行锁确定性测试（去掉 `with_for_update` 时该测试会失败）（2 个）
+- `tests/test_trade_concurrency.py`：交易并发加锁顺序与同一物品多意向并发成交互斥测试（3 个）
+- `tests/test_password_reset.py`：管理员核实身份重置学生密码、旧令牌失效、强制改密拦截与改密后恢复（2 个）
 - `tests/test_assistant.py`：AI 助手（用假的大模型，不花钱）：工具调用只返回已上架内容、模型乱填参数不崩溃、工具轮数上限、降级、校验与限流、提示词缓存结构；个人工具只给登录用户、只查自己、不泄露微信号；草稿按发布规则校验、不写库、受每日上限约束；全站每日调用上限（16 个）
 - `tests/test_wall.py`：校园墙先审后发、匿名不泄露、帖子不混进物品列表、越权、每日上限、筛选排序（9 个）
 - `tests/test_wall_interact.py`：点赞幂等、楼主在评论和通知里保持匿名、评论规则、删除与下架、已解决、举报帖子和评论（9 个）
 - `tests/test_wall_admin.py`：AI 预审（假的大模型）的写入、容错、提示注入处理、并发修改；官方帖、置顶、游客统计（9 个）
-- 隔离：每个测试在一个事务里运行，结束整体回滚，**不会改动演示数据**；并发测试需要真实提交，自己造临时数据并在结束时删除
+- 合计 **59 个自动化测试用例**；隔离方式：每个测试在一个事务里运行，结束整体回滚，**不会改动演示数据**；并发测试需要真实提交，自己造临时数据并在结束时删除
 
 ## 演示数据「保鲜」
 

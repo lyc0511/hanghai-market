@@ -7,6 +7,7 @@ import { useRoute, useRouter } from 'vue-router'
 
 import { itemApi } from '@/api'
 import ItemCard from '@/components/ItemCard.vue'
+import SectionBanner from '@/components/SectionBanner.vue'
 import { Button } from '@/components/ui/button'
 import {
   Pagination,
@@ -88,21 +89,20 @@ onMounted(() => {
 
 <template>
   <div class="container">
-    <div class="flex items-end justify-between gap-4">
-      <div>
-        <h1 class="font-display text-4xl text-ocean">二手市场</h1>
-        <p class="mt-1 text-sm text-muted-foreground">
-          <template v-if="keyword">「{{ keyword }}」的搜索结果，</template>共 {{ total }} 件在售
-          <button v-if="keyword" type="button" class="ml-1 inline-flex items-center text-signal hover:underline" @click="router.replace({ name: 'market' })">
-            <X class="size-3.5" />清除搜索
-          </button>
-        </p>
-      </div>
-      <Button @click="onPublish"><Plus />发布闲置</Button>
-    </div>
+    <SectionBanner eyebrow="二手航道" title="二手市场">
+      <template #description>
+        <template v-if="keyword">「{{ keyword }}」的搜索结果，</template>共 {{ total }} 件在售，支持黄埔与琶洲校区筛选
+        <button v-if="keyword" type="button" class="ml-1.5 inline-flex items-center text-signal hover:underline" @click="router.replace({ name: 'market' })">
+          <X class="size-3.5" />清除搜索
+        </button>
+      </template>
+      <template #actions>
+        <Button @click="onPublish"><Plus />发布闲置</Button>
+      </template>
+    </SectionBanner>
 
-    <!-- 筛选：分类用按钮（常用、一眼看全），其余用下拉 -->
-    <div class="mt-6 flex flex-wrap items-center justify-between gap-3 border-y py-3">
+    <!-- 筛选工具栏：分类胶囊 + 校区 / 成色 / 排序 -->
+    <div class="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-white p-3.5">
       <div class="flex flex-wrap gap-1.5" role="radiogroup" aria-label="分类">
         <button
           v-for="c in [{ id: 0, name: '全部' }, ...meta.itemCategories]"
