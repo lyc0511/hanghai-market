@@ -8,6 +8,7 @@ CREATE TABLE users (
   student_no    VARCHAR(20)  NOT NULL UNIQUE,
   nickname      VARCHAR(30)  NOT NULL,
   password_hash VARCHAR(100) NOT NULL,
+  must_change_password BOOLEAN NOT NULL DEFAULT FALSE,
   avatar_url    TEXT,
   campus_area   VARCHAR(32),
   wechat_id_enc TEXT,

@@ -5,6 +5,7 @@
 <script setup>
 import { Loader2 } from '@lucide/vue'
 import { computed, onMounted, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -17,6 +18,7 @@ const props = defineProps({ initialMode: { type: String, default: 'login' } })
 const emit = defineEmits(['success'])
 
 const user = useUserStore()
+const router = useRouter()
 const meta = useMetaStore()
 
 const mode = ref(props.initialMode) // login | register
@@ -62,6 +64,7 @@ async function onSubmit() {
       await user.login(form.studentNo, form.password)
     }
     emit('success')
+    if (user.profile?.must_change_password) await router.replace({ name: 'change-password' })
   } catch {
     /* 错误提示已由 http.js 弹出 */
   } finally {
@@ -87,6 +90,7 @@ async function onSubmit() {
       </button>
     </div>
 
+    <p v-if="!isRegister" class="mb-4 text-sm text-muted-foreground">忘记密码？请联系管理员核实学生身份，领取临时密码后登录并设置新密码。</p>
     <form class="space-y-4" novalidate @submit.prevent="onSubmit">
       <div class="space-y-1.5">
         <Label for="studentNo">学号</Label>

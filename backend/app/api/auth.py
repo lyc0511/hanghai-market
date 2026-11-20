@@ -10,7 +10,7 @@ from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import get_authenticated_user, get_current_user
 from app.core.crypto import decrypt_text, encrypt_text
 from app.core.exceptions import BizError
 from app.core.security import create_access_token, hash_password, verify_password
@@ -24,7 +24,7 @@ router = APIRouter(prefix="/auth", tags=["认证"])
 
 def user_out(user: User) -> UserOut:
     out = UserOut.model_validate(user)
-    out.wechat_id = decrypt_text(user.wechat_id_enc)
+    out.wechat_id = None if user.must_change_password else decrypt_text(user.wechat_id_enc)
     return out
 
 
@@ -66,7 +66,7 @@ def login(body: LoginIn, db: Session = Depends(get_db)) -> ApiResponse[TokenOut]
 
 
 @router.get("/me", response_model=ApiResponse[UserOut], summary="当前登录用户")
-def me(user: User = Depends(get_current_user)) -> ApiResponse[UserOut]:
+def me(user: User = Depends(get_authenticated_user)) -> ApiResponse[UserOut]:
     return ok(user_out(user))
 
 
@@ -93,7 +93,7 @@ def update_me(
 @router.post("/password", response_model=ApiResponse[None], summary="修改密码")
 def change_password(
     body: ChangePasswordIn,
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_authenticated_user),
     db: Session = Depends(get_db),
 ) -> ApiResponse[None]:
     if not verify_password(body.old_password, user.password_hash):
@@ -102,7 +102,7 @@ def change_password(
         raise BizError(42200, "新密码不能与原密码相同")
     # 仅在密码仍是刚才核验的版本时更新，避免两个并发修改互相覆盖。
     changed_id = db.scalar(update(User).where(User.id == user.id, User.password_hash == user.password_hash)
-                           .values(password_hash=hash_password(body.new_password)).returning(User.id))
+                           .values(password_hash=hash_password(body.new_password), must_change_password=False).returning(User.id))
     if changed_id is None:
         raise BizError(40103, "密码已变更，请重新登录")
     db.commit()

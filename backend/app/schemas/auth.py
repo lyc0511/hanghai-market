@@ -104,6 +104,7 @@ class UserOut(BaseModel):
     campus_area: str | None
     wechat_visible: bool
     role: str
+    must_change_password: bool = False
     wechat_id: str | None = Field(default=None, description="本人的微信号（已解密）")
     created_at: datetime
 

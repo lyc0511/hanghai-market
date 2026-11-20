@@ -79,6 +79,7 @@ export const clubApi = {
 }
 
 export const adminApi = {
+  resetPassword: (id) => http.post(`/admin/users/${id}/reset-password`, { identity_verified: true }),
   items: (params) => http.get('/admin/items', { params }),
   approveItem: (id) => http.post(`/admin/items/${id}/approve`),
   rejectItem: (id, reason) => http.post(`/admin/items/${id}/reject`, { reason }),

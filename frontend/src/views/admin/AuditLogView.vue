@@ -6,6 +6,7 @@ import { adminApi } from '@/api'
 import { formatDateTime } from '@/lib/time'
 
 const ACTIONS = {
+  reset_password: { label: '重置学生密码', type: 'warning' },
   approve_item: { label: '物品审核通过', type: 'success' },
   reject_item: { label: '物品审核驳回', type: 'warning' },
   approve_activity: { label: '活动审核通过', type: 'success' },

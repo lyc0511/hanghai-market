@@ -30,7 +30,7 @@ def session_user(db: Session, token: str) -> User | None:
     return user
 
 
-def get_current_user(
+def get_authenticated_user(
     cred: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     db: Session = Depends(get_db),
 ) -> User:
@@ -44,6 +44,12 @@ def get_current_user(
     return user
 
 
+def get_current_user(user: User = Depends(get_authenticated_user)) -> User:
+    if user.must_change_password:
+        raise HTTPException(status_code=403, detail="请先设置新密码")
+    return user
+
+
 def get_optional_user(
     cred: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     db: Session = Depends(get_db),
@@ -52,7 +58,7 @@ def get_optional_user(
     if cred is None:
         return None
     user = session_user(db, cred.credentials)
-    return user if user is not None and user.status == "active" else None
+    return user if user is not None and user.status == "active" and not user.must_change_password else None
 
 
 def require_admin(user: User = Depends(get_current_user)) -> User:

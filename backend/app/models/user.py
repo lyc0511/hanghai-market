@@ -19,6 +19,7 @@ class User(Base):
     student_no: Mapped[str] = mapped_column(String(20), nullable=False, unique=True)
     nickname: Mapped[str] = mapped_column(String(30), nullable=False)
     password_hash: Mapped[str] = mapped_column(String(100), nullable=False)
+    must_change_password: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("FALSE"))
     avatar_url: Mapped[str | None] = mapped_column(Text)
     campus_area: Mapped[str | None] = mapped_column(String(32))
     wechat_id_enc: Mapped[str | None] = mapped_column(Text)

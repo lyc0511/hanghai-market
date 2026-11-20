@@ -52,6 +52,7 @@ const routes = [
       { path: 'audit-logs', name: 'admin-audit-logs', component: () => import('@/views/admin/AuditLogView.vue'), meta: { title: '操作日志' } },
     ],
   },
+  { path: '/change-password', name: 'change-password', component: () => import('@/views/ChangePasswordView.vue'), meta: { title: '设置新密码', auth: true } },
   { path: '/login', name: 'login', component: () => import('@/views/LoginView.vue'), meta: { title: '登录' } },
   { path: '/:pathMatch(.*)*', redirect: '/' },
 ]
@@ -75,6 +76,9 @@ router.beforeEach(async (to) => {
     } catch {
       /* 令牌失效时 http.js 已处理跳转 */
     }
+  }
+  if (user.profile?.must_change_password && to.name !== 'change-password') {
+    return { name: 'change-password' }
   }
   if (to.meta.admin && !user.isAdmin) {
     toast.error('需要管理员账号')

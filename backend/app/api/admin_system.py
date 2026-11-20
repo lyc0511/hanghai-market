@@ -12,8 +12,9 @@
 from datetime import date, datetime, timedelta, timezone
 from typing import Literal
 from zoneinfo import ZoneInfo
+import secrets
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy import Date, cast, func, or_, select
 from sqlalchemy.orm import Session
 
@@ -21,6 +22,8 @@ from app.api.deps import require_admin
 from app.api.notifications import notify
 from app.core.exceptions import BizError
 from app.core.query import contains
+from app.core.security import hash_password
+from app.schemas.admin_system import PasswordResetIn, PasswordResetOut
 from app.db.session import get_db
 from app.models import (
     Activity,
@@ -145,6 +148,31 @@ def list_users(
         select(User).where(*where).order_by(User.id).offset((page - 1) * page_size).limit(page_size)
     ).all()
     return ok(Page(items=[user_out(db, u) for u in rows], total=total, page=page, page_size=page_size))
+
+
+@router.post("/users/{user_id}/reset-password", response_model=ApiResponse[PasswordResetOut], summary="核实身份后重置学生密码")
+def reset_password(
+    user_id: int,
+    body: PasswordResetIn,
+    response: Response,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> ApiResponse[PasswordResetOut]:
+    user = db.scalar(select(User).where(User.id == user_id).with_for_update())
+    if user is None:
+        raise BizError(40471, "用户不存在")
+    if user.role == "admin" or user.id == admin.id:
+        raise BizError(40371, "此入口仅用于重置学生账号密码")
+    if user.status != "active":
+        raise BizError(40971, "请先处理账号封禁状态")
+    temporary_password = "Tmp9-" + secrets.token_urlsafe(16)
+    user.password_hash = hash_password(temporary_password)
+    user.must_change_password = True
+    db.add(AuditLog(admin_id=admin.id, action="reset_password", target_type="user",
+                    target_id=user.id, detail={"identity_verified": body.identity_verified}))
+    db.commit()
+    response.headers["Cache-Control"] = "no-store"
+    return ok(PasswordResetOut(temporary_password=temporary_password), "密码已重置，请私下交给核实身份后的本人")
 
 
 def lock_user(db: Session, user_id: int, admin: User) -> User:

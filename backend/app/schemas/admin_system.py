@@ -1,6 +1,7 @@
 """管理后台：数据看板、用户管理、操作日志。"""
 from datetime import date, datetime
 from typing import Any
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -48,6 +49,14 @@ class AdminUserOut(BaseModel):
 class BanIn(BaseModel):
     reason: str = Field(min_length=2, max_length=200)
     offline_items: bool = Field(default=True, description="同时下架其在售物品")
+
+
+class PasswordResetIn(BaseModel):
+    identity_verified: Literal[True]
+
+
+class PasswordResetOut(BaseModel):
+    temporary_password: str
 
 
 class AuditLogOut(BaseModel):

@@ -20,6 +20,28 @@ const rows = ref([])
 const total = ref(0)
 const loading = ref(false)
 const busyId = ref(null)
+const resetResult = reactive({ visible: false, studentNo: '', password: '' })
+
+async function resetPassword(row) {
+  if (busyId.value !== null) return
+  try {
+    await ElMessageBox.confirm(
+      `请先当面或通过可信渠道核实「${row.nickname}（${row.student_no}）」的学生身份。重置会使所有旧登录失效。确认已核实本人身份？`,
+      '重置密码', { confirmButtonText: '已核实身份，重置', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch {
+    return
+  }
+  busyId.value = row.id
+  try {
+    const result = await adminApi.resetPassword(row.id)
+    Object.assign(resetResult, { visible: true, studentNo: row.student_no, password: result.temporary_password })
+  } catch {
+    /* 请求失败由统一拦截器提示，可重新操作 */
+  } finally {
+    busyId.value = null
+  }
+}
 const dialog = reactive({ visible: false, row: null, reason: '', offline_items: true, submitting: false })
 
 async function load() {
@@ -127,9 +149,10 @@ onMounted(load)
           <el-tag v-else type="success" size="small" effect="plain">正常</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="110" fixed="right">
+      <el-table-column label="操作" width="210" fixed="right">
         <template #default="{ row }">
           <template v-if="canBan(row)">
+            <el-button v-if="row.status === 'active'" size="small" :disabled="busyId !== null" @click="resetPassword(row)">重置密码</el-button>
             <el-button v-if="row.status === 'active'" type="danger" size="small" plain @click="openBan(row)">封禁</el-button>
             <el-button v-else size="small" :loading="busyId === row.id" @click="unban(row)">解封</el-button>
           </template>
@@ -151,6 +174,14 @@ onMounted(load)
       />
     </div>
   </el-card>
+
+  <el-dialog v-model="resetResult.visible" title="临时密码" width="480px" @closed="resetResult.password = ''">
+    <p>学号 {{ resetResult.studentNo }}</p>
+    <p>请复制并通过私下渠道交给已核实身份的本人。关闭后无法再次查看，可重新生成。</p>
+    <el-input :model-value="resetResult.password" readonly aria-label="临时密码" />
+    <p>学生用它登录后必须设置新密码。</p>
+    <template #footer><el-button @click="resetResult.visible = false">已记录，关闭</el-button></template>
+  </el-dialog>
 
   <el-dialog v-model="dialog.visible" title="封禁用户" width="480px">
     <p class="dialog-item">{{ dialog.row?.nickname }}（{{ dialog.row?.student_no }}）</p>
