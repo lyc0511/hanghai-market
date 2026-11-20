@@ -129,6 +129,8 @@ onMounted(() => {
               <Button size="sm" variant="outline" @click="router.push({ name: 'item-edit', params: { id: it.id } })">编辑</Button>
               <Button v-if="it.status !== 'offline'" size="sm" variant="outline" :disabled="busyId === it.id" @click="act(it, 'offline')">下架</Button>
               <Button v-else size="sm" :disabled="busyId === it.id" @click="act(it, 'relist')">重新上架</Button>
+              <!-- 在售的要先下架才能删，防止误删 -->
+              <Button v-if="it.status === 'offline' || it.status === 'rejected'" size="sm" variant="destructive" :disabled="busyId === it.id" @click="act(it, 'remove')">删除</Button>
             </template>
             <Button v-else size="sm" variant="destructive" :disabled="busyId === it.id" @click="act(it, 'remove')">删除</Button>
           </div>

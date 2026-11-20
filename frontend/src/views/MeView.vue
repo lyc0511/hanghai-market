@@ -1,7 +1,7 @@
-<!-- 个人中心：基本信息、微信号设置、常用入口 -->
+<!-- 个人中心：基本信息、昵称和校区、微信号设置、常用入口 -->
 <script setup>
 import { Bell, CalendarDays, ChevronRight, Flag, Loader2, LogOut, Package, PenLine, Settings, ShieldCheck, ShoppingBag, Store, Users } from '@lucide/vue'
-import { ref } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 
@@ -10,13 +10,45 @@ import PageHeader from '@/components/PageHeader.vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { confirm } from '@/composables/confirm'
+import { useMetaStore } from '@/stores/meta'
 import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
 const user = useUserStore()
+const meta = useMetaStore()
+onMounted(() => meta.load().catch(() => {}))
+
+// 修改昵称和校区
+const profileOpen = ref(false)
+const profileForm = reactive({ nickname: '', campus: '' })
+const profileSaving = ref(false)
+
+function openProfile() {
+  profileForm.nickname = user.profile?.nickname ?? ''
+  profileForm.campus = user.profile?.campus_area ?? ''
+  profileOpen.value = true
+}
+
+async function saveProfile() {
+  const nickname = profileForm.nickname.trim()
+  if (!nickname) return toast.error('昵称不能为空')
+  profileSaving.value = true
+  try {
+    const body = { nickname }
+    if (profileForm.campus) body.campus_area = profileForm.campus
+    user.profile = await authApi.updateMe(body)
+    profileOpen.value = false
+    toast.success('资料已保存')
+  } catch {
+    /* 错误提示已由 http.js 弹出 */
+  } finally {
+    profileSaving.value = false
+  }
+}
 
 const wechatOpen = ref(false)
 const wechatInput = ref('')
@@ -98,7 +130,15 @@ async function onLogout() {
       </div>
     </section>
 
-    <section class="mt-6 rounded-xl border bg-white">
+    <section class="mt-6 divide-y rounded-xl border bg-white">
+      <button type="button" class="flex w-full items-center gap-3 px-4 py-4 text-left hover:bg-sail" @click="openProfile">
+        <span class="flex-1">
+          <span class="block font-medium text-ocean">昵称和校区</span>
+          <span class="mt-0.5 block text-xs text-muted-foreground">学号不能改，昵称和校区随时可以改</span>
+        </span>
+        <span class="truncate text-sm text-ocean">{{ user.profile?.nickname }}，{{ user.profile?.campus_area ?? '未设置校区' }}</span>
+        <ChevronRight class="size-4 shrink-0 text-muted-foreground" />
+      </button>
       <button type="button" class="flex w-full items-center gap-3 px-4 py-4 text-left hover:bg-sail" @click="openWechat">
         <span class="flex-1">
           <span class="block font-medium text-ocean">微信号</span>
@@ -144,6 +184,34 @@ async function onLogout() {
           <Input id="confirm-password" name="confirm_password" type="password" autocomplete="new-password" maxlength="32" required />
           <DialogFooter><Button type="submit" :disabled="passwordSaving">保存新密码</Button></DialogFooter>
         </form>
+      </DialogContent>
+    </Dialog>
+
+    <Dialog v-model:open="profileOpen">
+      <DialogContent class="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>修改昵称和校区</DialogTitle>
+          <DialogDescription>昵称会显示在你发布的物品、评论和社团成员列表里</DialogDescription>
+        </DialogHeader>
+        <div class="space-y-4">
+          <div class="space-y-1.5">
+            <Label for="me-nickname">昵称</Label>
+            <Input id="me-nickname" v-model="profileForm.nickname" maxlength="30" class="h-10" @keyup.enter="saveProfile" />
+          </div>
+          <div class="space-y-1.5">
+            <Label>校区</Label>
+            <Select v-model="profileForm.campus">
+              <SelectTrigger class="h-10 w-full"><SelectValue placeholder="选择校区" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem v-for="c in meta.enums?.campus_area ?? []" :key="c" :value="c">{{ c }}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" @click="profileOpen = false">取消</Button>
+          <Button :disabled="profileSaving" @click="saveProfile"><Loader2 v-if="profileSaving" class="animate-spin" />保存</Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
 

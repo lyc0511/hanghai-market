@@ -271,7 +271,7 @@ watch(
         <Button v-else-if="action === 'pending'" class="mt-5 w-full" disabled>申请审核中</Button>
         <Button v-else-if="action === 'member'" variant="outline" class="mt-5 w-full" @click="onLeave">退出社团</Button>
         <template v-else-if="action === 'president'">
-          <Button variant="outline" class="mt-5 w-full" @click="openEdit">编辑招新信息</Button>
+          <Button variant="outline" class="mt-5 w-full" @click="openEdit">编辑社团资料</Button>
           <Button class="mt-2 w-full" @click="router.push({ name: 'club-applications', params: { id: club.id } })">
             审批申请<span v-if="club.pending_count">（{{ club.pending_count }}）</span>
           </Button>
@@ -300,7 +300,7 @@ watch(
     <Dialog v-model:open="editOpen">
       <DialogContent class="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>编辑招新信息</DialogTitle>
+          <DialogTitle>编辑社团资料</DialogTitle>
           <DialogDescription>可以改简介、招新开关和说明。社团名称和会长不会在这里改变。</DialogDescription>
         </DialogHeader>
         <div class="grid gap-3">

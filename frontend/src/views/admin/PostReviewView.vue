@@ -8,7 +8,8 @@ import 'element-plus/es/components/message/style/css'
 import 'element-plus/es/components/message-box/style/css'
 import { onMounted, reactive, ref } from 'vue'
 
-import { adminApi } from '@/api'
+import { adminApi, uploadApi } from '@/api'
+import { prepareImage } from '@/lib/image'
 import { useMetaStore } from '@/stores/meta'
 import { formatDateTime } from '@/lib/time'
 
@@ -80,19 +81,58 @@ async function approve(row) {
 }
 
 // 发布官方帖：不用审核，直接上墙
-const official = reactive({ visible: false, tagId: null, body: '', pinned: true, submitting: false })
+// 图片选好后立刻上传（管理员发的不需要打码），images 里存 {path, url}
+const OFFICIAL_IMAGES_MAX = 4
+const official = reactive({ visible: false, tagId: null, body: '', pinned: true, images: [], uploading: 0, submitting: false })
+const officialFile = ref(null)
 
 function openOfficial() {
-  Object.assign(official, { visible: true, tagId: meta.postTags.find((t) => t.slug === 'other')?.id ?? null, body: '', pinned: true })
+  if (official.uploading || official.submitting) return
+  Object.assign(official, { visible: true, tagId: meta.postTags.find((t) => t.slug === 'other')?.id ?? null, body: '', pinned: true, images: [] })
+}
+
+function closeOfficial() {
+  if (official.uploading || official.submitting) {
+    ElMessage.warning('正在上传或发布，请稍等')
+    return
+  }
+  official.visible = false
+}
+
+async function onOfficialPick(e) {
+  if (official.uploading || official.submitting) {
+    e.target.value = ''
+    return
+  }
+  const picked = [...e.target.files].slice(0, OFFICIAL_IMAGES_MAX - official.images.length - official.uploading)
+  e.target.value = '' // 清空，允许再次选择同一张图
+  for (const file of picked) {
+    if (file.size > 10 * 1024 * 1024) {
+      ElMessage.warning(`「${file.name}」超过 10MB`)
+      continue
+    }
+    official.uploading += 1
+    try {
+      // 先压缩并去掉拍摄地点等隐藏信息，再上传
+      const blob = await prepareImage(file)
+      official.images.push(await uploadApi.image(new File([blob], 'official.jpg', { type: 'image/jpeg' })))
+    } catch {
+      ElMessage.error(`「${file.name}」上传失败，请换一张或重试`)
+    } finally {
+      official.uploading -= 1
+    }
+  }
 }
 
 async function submitOfficial() {
+  if (official.submitting) return
   const body = official.body.trim()
   if (!official.tagId) return ElMessage.warning('请选择标签')
   if (body.length < 2 || body.length > 500) return ElMessage.warning('正文 2–500 个字')
+  if (official.uploading) return ElMessage.warning('图片还在上传，请稍等')
   official.submitting = true
   try {
-    await adminApi.createOfficialPost({ tag_id: official.tagId, body, pinned: official.pinned })
+    await adminApi.createOfficialPost({ tag_id: official.tagId, body, pinned: official.pinned, images: official.images.map((i) => i.path) })
     ElMessage.success('已发布')
     official.visible = false
     query.status = 'online'
@@ -232,16 +272,32 @@ onMounted(() => {
     </div>
   </el-card>
 
-  <el-dialog v-model="official.visible" title="发布官方帖" width="520px">
+  <el-dialog v-model="official.visible" title="发布官方帖" width="520px" :before-close="closeOfficial">
     <p class="muted hint">官方帖不用审核，发布后立刻出现在墙上，显示为「官方」。适合发规则说明和通知。</p>
     <el-select v-model="official.tagId" placeholder="选择标签" style="width: 160px; margin-bottom: 10px">
       <el-option v-for="t in meta.postTags" :key="t.id" :value="t.id" :label="t.name" />
     </el-select>
     <el-input v-model="official.body" type="textarea" :rows="6" maxlength="500" show-word-limit placeholder="正文，2–500 字" />
+    <div class="official-images">
+      <div v-for="(img, i) in official.images" :key="img.path" class="official-thumb">
+        <img :src="img.url" alt="" />
+        <button type="button" class="official-remove" aria-label="删除这张图" @click="official.images.splice(i, 1)">×</button>
+      </div>
+      <el-button
+        v-if="official.images.length + official.uploading < OFFICIAL_IMAGES_MAX"
+        :loading="official.uploading > 0"
+        :disabled="official.submitting"
+        @click="officialFile.click()"
+      >
+        添加图片
+      </el-button>
+      <span class="muted">选填，最多 {{ OFFICIAL_IMAGES_MAX }} 张</span>
+      <input ref="officialFile" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden @change="onOfficialPick" />
+    </div>
     <el-checkbox v-model="official.pinned" class="mt">同时置顶</el-checkbox>
     <template #footer>
-      <el-button @click="official.visible = false">取消</el-button>
-      <el-button type="primary" :loading="official.submitting" @click="submitOfficial">发布</el-button>
+      <el-button :disabled="!!official.uploading || official.submitting" @click="closeOfficial">取消</el-button>
+      <el-button type="primary" :loading="official.submitting" :disabled="!!official.uploading" @click="submitOfficial">发布</el-button>
     </template>
   </el-dialog>
 
@@ -268,6 +324,39 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.official-images {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.official-thumb {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  overflow: hidden;
+  border-radius: 8px;
+  border: 1px solid var(--el-border-color);
+}
+.official-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.official-remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 0.55);
+  color: #fff;
+  line-height: 20px;
+  cursor: pointer;
+}
 .panel {
   border-radius: var(--r);
 }
