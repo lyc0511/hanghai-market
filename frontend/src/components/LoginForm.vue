@@ -94,7 +94,7 @@ async function onSubmit() {
     <form class="space-y-4" novalidate @submit.prevent="onSubmit">
       <div class="space-y-1.5">
         <Label for="studentNo">学号</Label>
-        <Input id="studentNo" v-model.trim="form.studentNo" inputmode="numeric" maxlength="20" placeholder="例如 20230002" :aria-invalid="!!errors.studentNo" class="h-10" />
+        <Input id="studentNo" v-model.trim="form.studentNo" inputmode="numeric" maxlength="20" placeholder="请输入学号" :aria-invalid="!!errors.studentNo" class="h-10" />
         <p v-if="errors.studentNo" class="text-sm text-destructive">{{ errors.studentNo }}</p>
       </div>
 
@@ -132,7 +132,6 @@ async function onSubmit() {
         <Loader2 v-if="submitting" class="animate-spin" />
         {{ isRegister ? '注册并登录' : '登录' }}
       </Button>
-      <p v-if="!isRegister" class="text-center text-xs text-muted-foreground">演示账号：20230002 / Test1234</p>
     </form>
   </div>
 </template>
